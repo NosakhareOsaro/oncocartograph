@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "OncoCartograph: Integrative Multi-Omics Biomarker Prioritisation for Triple-Negative Breast Cancer"
 type: software
-version: 0.2.0
+version: 0.3.0
 date-released: 2026-07-20
 authors:
   - family-names: Osaro
