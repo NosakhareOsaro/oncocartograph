@@ -12,6 +12,8 @@ own number.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-20
+
 External validation against GSE96058 (SCAN-B), a real independent RNA-seq
 TNBC cohort.
 
