@@ -12,8 +12,45 @@ end-to-end).
 
 ### Deferred (by design)
 
-- `feat/mofa-integration`, `feat/scoring-package`, `feat/validation`,
-  `feat/drug-target-scoring`, `feat/reporting`.
+- `feat/scoring-package`, `feat/validation`, `feat/drug-target-scoring`,
+  `feat/reporting`.
+
+## [0.2.0] - 2026-07-20
+
+MOFA+ integration working end-to-end against the real preprocessed
+cohort, not just synthetic fixtures.
+
+- ADR 0006: `mofapy2`/`mofax` (pure Python) for MOFA+ training and
+  interpretation, retracting an earlier assumption that this stage would
+  need an R + MOFA2 environment — verified directly before writing any
+  code.
+- `oncocartograph.integration.mofa` — long-format view construction
+  (verified to correctly handle both whole-patient absence from a view
+  and scattered missing values within a view), training with confirmed
+  hyperparameters (K=15, `scale_views=True`, `convergence_mode="slow"`,
+  seed from config), and result extraction (factor values, variance
+  explained).
+- Fixed a real bug caught by the first end-to-end test: mofapy2 sorts
+  view names alphabetically internally regardless of input order, so a
+  likelihoods list built in dict-insertion order can silently misassign
+  a likelihood to the wrong view. Fixed by sorting view names before
+  building the likelihoods list.
+- Fixed a real gap found while preparing this work package: the copy
+  number view had ~60,623 genes with no feature-selection step (a 30x
+  imbalance against the other views' 2,000-5,000). Added the same
+  top-variable-gene selection already used for RNA-seq/methylation.
+- **Real training run (2026-07-20):** copy number (2,000×142), RNA-seq
+  (2,000×142), methylation (5,000×104), mutation (845×122); 143 patients
+  total via view union, no forced complete-case subset. 12/15 factors
+  clear a ≥2%-variance-explained screening threshold. Factor1 is
+  overwhelmingly copy-number-driven (56.5% CNV variance, <1.1%
+  elsewhere); the mutation view contributes essentially no variance to
+  any factor (≤0.003%) — both reported as real findings in
+  `docs/methods.md` §3.4/§8, with implications for the scoring work
+  package (mutation biomarkers will need direct statistics, not MOFA+
+  loadings).
+- 105 tests total, 100% coverage, verified against the Python 3.11
+  target throughout.
 
 ## [0.1.0] - 2026-07-20
 
