@@ -398,10 +398,76 @@ sub-cohort of TCGA-BRCA can realistically support.
 
 ## 5. External validation
 
-_Pending — will document the GSE96058 (SCAN-B) cohort's TNBC subsetting
-criteria (matched to Section 1.2 where the available fields allow), and the
-comparison methodology against Burstein et al. 2015 (PMID 25208879)
-subtype-specific druggable target calls, once `feat/validation` lands._
+Implemented in `oncocartograph.validation`. Full methodology and the
+pre-registered pass/fail criterion are in
+[`docs/adr/0009-external-replication-methodology-and-result.md`](adr/0009-external-replication-methodology-and-result.md);
+summarized here.
+
+### 5.1 GSE96058 (SCAN-B) TNBC sub-cohort
+
+GSE96058's clinical/survival metadata ships as two platform-specific GEO
+series-matrix files (GPL11154/HiSeq 2000, GPL18573/NextSeq 500; 3,409
+samples total, including 136 technical replicates), parsed by
+`gse96058_clinical.read_combined_clinical`. Technical replicates (`title`
+ending in `repl`) are dropped before classification. Unlike TCGA's IHC
+strings (§1.2), GSE96058's `er status`/`pgr status`/`her2 status` fields
+are already histopathology-resolved to `"0"`/`"1"`/`"NA"` — this project
+applies the same all-negative rule (excluding, not imputing, any
+indeterminate marker) directly to those values
+(`gse96058_cohort.classify_gse96058_sample`), per the confirmed judgment
+call to use histopathology status only and exclude `"NA"` rather than
+falling back to the file's ER/HER2/Ki67 prediction columns. Real result:
+**N=143 TNBC samples, 26 events** on `overall survival days`/
+`overall survival event`.
+
+### 5.2 Candidate mapping: TCGA (Ensembl ID) → GSE96058 (gene symbol)
+
+GSE96058's expression matrix is gene-symbol-indexed (not Ensembl ID),
+confirmed by downloading and inspecting the real
+`GSE96058_gene_expression_3273_samples_and_136_replicates_transformed.csv.gz`
+file (~564MB; log2(FPKM+0.1)-transformed) before any code was written. It
+is read via `gse96058_expression.read_selected_gene_expression`, which
+streams the file row-by-row and keeps only requested gene symbols rather
+than loading all ~30,865 genes × 3,409 samples.
+
+TCGA candidate Ensembl IDs are resolved to gene symbols via the same
+`OpenTargetsClient.fetch_targets` client used for druggability evidence
+(§6), reused rather than duplicated. All 152/152 of the
+work package's chosen candidate set (all fittable TCGA RNA-seq candidates
+from §4.4 — the confirmed judgment call over a top-N subset) resolved to
+a gene symbol via the live API.
+
+### 5.3 Pre-registered criterion and Burstein plausibility check
+
+Given TCGA's own screen produced 0/709 FDR-significant candidates (§4.4),
+requiring GSE96058 to replicate nominal significance would be incoherent.
+The pre-registered primary criterion is instead **direction concordance**:
+sign of `log(hazard_ratio)` agreement between TCGA and GSE96058, tested
+against the 50% chance rate with a one-sided exact binomial test at
+`alpha=0.05` (`replication.run_direction_concordance_test`). This
+criterion, and the scope reduction of the Burstein et al. (2015) check
+from full LAR/MES/BLIS/BLIA subtyping to a five-gene (AR, PTEN, CD274,
+PDCD1, CTLA4) directional-plausibility check
+(`burstein_check.check_known_biology_markers`), were both fixed before
+the real analysis was run.
+
+### 5.4 Real result
+
+- **Primary criterion: FAILED.** Of 152 candidates, 109 had usable
+  GSE96058 Cox evidence; **45/109 (41.3%) were direction-concordant** —
+  below the 50% chance rate. One-sided binomial p=0.973 (≫ 0.05).
+  `success=False`, as defined, not reframed.
+- **Secondary (informational): 0/109 replicated at nominal p<0.05** in
+  GSE96058, consistent with TCGA's own null screen.
+- **Burstein plausibility check: 5/5 plausible.** AR, PTEN, CD274,
+  PDCD1, and CTLA4 all showed the literature-expected protective (HR<1)
+  direction in real GSE96058 data — a real, separate, reassuring signal
+  about the ingestion/scoring machinery, but it does not offset the
+  primary null result.
+
+The full per-candidate replication table (TCGA and GSE96058 hazard
+ratios, concordance flags, for all 152 candidates) is at
+`data/processed/gse96058_replication_table.csv`.
 
 ## 6. Drug-target evidence and prioritisation
 
@@ -576,3 +642,20 @@ something a different modeling choice within this project could fix.
 Any future work drawing conclusions from the mutation-recurrence pathway
 should treat surviving candidates' effect sizes (hazard ratios) with real
 caution, given how few carriers/events typically support them.
+
+**Added during `feat/validation`:** the pre-registered external
+replication check (§5) failed on its primary criterion — 45/109 (41.3%)
+TCGA candidates were direction-concordant in GSE96058, below the 50%
+chance rate (one-sided binomial p=0.973). This is consistent with, and
+arguably an expected consequence of, `feat/scoring-package`'s already-
+documented finding that TCGA's own screen produced 0/709 FDR-significant
+candidates: there was no reason to expect noise-level associations to
+point in a consistent direction in an independent cohort, and they did
+not. The composite-scored candidate rankings in this project should
+therefore be read as hypothesis-generating only, not as externally
+validated biomarkers, pending a better-powered discovery cohort. The
+Burstein et al. (2015) known-biology plausibility check (5/5 markers
+directionally consistent with the literature) is a real, separate,
+reassuring result about the validation pipeline's mechanics, not a
+replication of the TCGA-derived candidates, and should not be read as
+softening the primary null result.
