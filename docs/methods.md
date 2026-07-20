@@ -589,21 +589,44 @@ any of them.
 
 ## 7. Software and versions
 
-Recorded per-release in `CHANGELOG.md` and pinned in `pyproject.toml` /
-lockfiles. Full version table will be added once the pipeline has a first
-end-to-end run.
+Full pipeline runs (`feat/reporting`'s Snakemake execution) used the
+versions below, resolved fresh in the Python 3.11 Docker image that
+mirrors CI (`Dockerfile`) -- not just whatever happened to be pinned in
+`pyproject.toml`, which sets lower bounds (`>=`), not exact pins. Recorded
+here as an honest snapshot, per-release, rather than a promise these
+exact versions are reproduced automatically by every future install.
+
+| Package | Version |
+|---|---|
+| Python | 3.11.15 |
+| pandas | 2.3.3 |
+| numpy | 2.4.6 |
+| scipy | 1.17.1 |
+| lifelines | 0.30.3 |
+| pydeseq2 | 0.5.4 |
+| mofapy2 | 0.7.4 |
+| mofax | 0.3.7 |
+| requests | 2.34.2 |
+| pydantic | 2.13.4 |
+| pydantic-settings | 2.14.2 |
+| snakemake | 9.23.1 |
+| pyarrow | 25.0.0 |
+| PyYAML | 6.0.3 |
+
+Full dependency graph (including transitive/dev dependencies) is
+whatever `pip install -e ".[dev,workflow]"` resolves against
+`pyproject.toml` at install time; no lockfile is committed (a candidate
+refinement for exact reproducibility, not applied here -- see §8).
 
 ## 8. Limitations
 
-_Pending final version, but noted here early so it is not forgotten:_
 TCGA-BRCA IHC calls were made across many contributing institutions without
 fully centralised scoring, so some inter-site variability in ER/PR/HER2
 calls is expected and cannot be corrected for retrospectively. The GSE96058
 external cohort is Swedish and RNA-seq-only (no methylation/CNV/mutation
 validation), so external validation in this project is necessarily
 expression-centric. The Burstein et al. 2015 benchmark cohort is not
-population-matched to TCGA-BRCA. These limitations will be expanded with
-concrete impact assessments once results exist to discuss.
+population-matched to TCGA-BRCA.
 
 **Added during `feat/preprocessing`:** the copy number relative-log2
 transform (§2.3) does not correct for tumor purity or ploidy — a real
@@ -659,3 +682,18 @@ directionally consistent with the literature) is a real, separate,
 reassuring result about the validation pipeline's mechanics, not a
 replication of the TCGA-derived candidates, and should not be read as
 softening the primary null result.
+
+**Added during `feat/reporting`:** the real Snakemake pipeline
+(§7, `workflows/Snakefile`) has no committed dependency lockfile --
+`pyproject.toml` sets lower bounds (`>=`), not exact pins, so a future
+`pip install` could resolve different transitive versions than the ones
+recorded in §7's table, and MOFA+'s stochastic training means even an
+exact-version re-run will not reproduce bit-identical factor values
+(confirmed directly: a full independent re-run during this work package
+reproduced the same qualitative variance-explained pattern and the same
+qualitative validation conclusion, but with different exact numbers each
+time -- see §5.4). A committed lockfile is a candidate refinement for
+exact numerical reproducibility, not applied here. Separately, a
+from-scratch pipeline run depends on the continued availability and
+stable response format of four live third-party services (GDC, GEO,
+Open Targets, ChEMBL) this project does not control.
