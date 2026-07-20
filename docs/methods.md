@@ -289,11 +289,112 @@ from downstream interpretation). Two things worth noting honestly:
 
 ## 4. Composite biomarker scoring
 
-_Pending — will document the survival model (Cox proportional hazards vs.
-Fine-Gray competing-risks, chosen based on observed competing-event
-structure in the TNBC cohort), multiple-testing correction method,
-p-value/effect-size thresholds, and the druggability scoring formula once
-`feat/scoring-package` lands._
+Implemented in `oncocartograph.scoring`, a standalone package with zero
+dependency on the rest of `oncocartograph` (mechanically enforced by
+`tests/scoring/test_decoupling.py`), designed to be extractable to a
+PyPI package independently.
+
+### 4.1 Two candidate-generation pathways, one composite score
+
+Per the v0.2.0 MOFA+ finding that the mutation view contributes
+essentially no variance to any factor (§3.4), candidates enter the
+scoring pipeline via one of two distinct, explicitly typed pathways:
+
+- **MOFA+-derived** (RNA-seq/methylation/CNV): selected by factor
+  loading on one of the 12 factors passing the ≥2% variance-explained
+  screen (`mofax.get_top_features`). Recorded as `IntegrationEvidence`
+  (factor, loading weight, the factor's view-variance-explained).
+- **Mutation-derived**: selected by the recurrence filter already applied
+  in preprocessing (≥3 patients), bypassing MOFA+ entirely. Recorded as
+  `RecurrenceEvidence` (mutation count/fraction, plus an optional
+  Fisher's-exact categorical association test against any supplied
+  categorical outcome -- e.g. `vital_status` now, or a subtype label once
+  `feat/validation` defines one).
+
+Both pathways receive **identical survival-association treatment** (§4.2)
+and feed the **same composite formula** (§4.3) -- the pathway only
+determines which "selection pathway" evidence is attached, not a
+different scoring formula.
+
+### 4.2 Survival association: Cox PH on overall survival
+
+Univariate Cox proportional hazards (`lifelines`), continuous covariate
+for RNA-seq/methylation/CNV, binary covariate for mutations -- the same
+statistical treatment regardless of candidate origin. Cox PH on overall
+survival is used because it is the only model the real data supports:
+the TCGA-BRCA clinical file has no cause-of-death or recurrence coding to
+define a Fine-Gray competing event against, and no PFS/recurrence fields
+at all are populated for this cohort (see
+[`docs/adr/0007-survival-methodology-and-composite-score.md`](adr/0007-survival-methodology-and-composite-score.md)).
+
+**A fit is discarded (excluded, not included with invalid statistics) if
+any of the hazard ratio, either 95% CI bound, or the p-value is
+non-finite.** This matters more than it might sound: on the real
+recurrence-filtered mutation data (845 genes, 122 patients with mutation
+data, only 16 total events across the cohort), **712/845 genes (84%)
+produced a degenerate fit** -- lifelines does not always raise on this;
+it can return `NaN` statistics or a finite-looking but meaningless
+estimate (hazard ratio near zero, infinite upper CI bound) when a rare
+mutation's carrier subgroup contains too few of the 16 events to support
+a stable estimate. An initial NaN-only check caught just 92/845 (~11%);
+broadening to `np.isfinite` across all four statistics caught the true
+84%. This was found and fixed by running the real screen, not anticipated
+in advance.
+
+Multiple testing: Benjamini-Hochberg FDR correction
+(`scipy.stats.false_discovery_control`), applied across every candidate
+screened together in one call.
+
+### 4.3 Composite score
+
+`composite_biomarker_score` combines up to three evidence axes as a
+weighted average, **renormalized over whichever axes are actually
+present** for a given candidate:
+
+| Axis | Default weight | Source |
+|---|---|---|
+| Survival | 0.5 | §4.2, every candidate |
+| Druggability | 0.35 | Schema-defined here; populated by `feat/drug-target-scoring` |
+| Selection pathway | 0.15 | MOFA+ view-variance-explained, or mutation prevalence fraction |
+
+Renormalization matters specifically for mutation candidates: they
+structurally have no `IntegrationEvidence` (MOFA+ does not apply to
+them), and without renormalization they would be unfairly penalized for
+lacking an axis that could never apply. Survival scoring uses `1 - p`
+(preferring the FDR-adjusted p-value when available) and **floors
+protective associations (hazard ratio ≤ 1) to 0** rather than a negative
+value -- this project's explicit choice to treat "druggable biomarker" as
+"something harmful to disrupt," not "anything survival-associated
+regardless of direction."
+
+### 4.4 Real scoring run (2026-07-20)
+
+Screened 709 total candidates (576 MOFA+-derived across RNA-seq/
+methylation/copy number + 133 mutation-derived, of the 845 mutation genes
+attempted) against the real 143-patient survival table (16 events), with
+no druggability evidence yet (§4.3's druggability axis renormalizes away
+until `feat/drug-target-scoring` populates it).
+
+**0 of 709 candidates survived FDR correction (p_adj < 0.05)** -- the
+expected honest outcome of screening hundreds of candidates against only
+16 events, flagged as a real limitation before this work package began,
+not a surprise after the fact. 349/709 candidates showed a harmful
+direction (HR>1).
+
+The top-ranked candidate overall was an RNA-seq gene
+(`ENSG00000172551.11`, composite score 0.61, HR=1.25, p_adj=0.21) selected
+via MOFA+ factor loading. A mutation-derived candidate (`GTF3C1`, HR≈11.9,
+p_adj=0.43) ranked 6th, demonstrating the two-pathway architecture works
+as designed -- both selection pathways produced real evidence that ranks
+together in one composite ordering, not two separate pipelines. `GTF3C1`'s
+extreme hazard ratio should be read cautiously: it reflects a very small
+number of mutation carriers and events, exactly the kind of estimate
+instability §4.2 describes, not a confidently large effect.
+
+**Given no candidate reached significance after correction, this
+project's rankings should be treated as hypothesis-generating, not
+confirmatory** -- consistent with what a 16-event, 143-patient TNBC
+sub-cohort of TCGA-BRCA can realistically support.
 
 ## 5. External validation
 
@@ -349,3 +450,17 @@ as such during biomarker scoring. Training reached the 1,000-iteration
 cap without formally satisfying `"slow"` mode's ELBO tolerance (though
 the remaining change per iteration was <0.0002%); a longer iteration cap
 is a candidate refinement for a final canonical run.
+
+**Added during `feat/scoring-package`:** with only 16 observed events in
+the 143-patient cohort, 0 of 709 screened candidates survived FDR
+correction in the real scoring run (§4.4) -- an expected consequence of
+the event count, not a pipeline defect, but it means current rankings are
+hypothesis-generating rather than confirmatory. More strikingly, 84% of
+recurrence-filtered mutation genes (712/845) could not produce a finite
+Cox estimate at all, because their mutated subgroup contained too few of
+the 16 total events to support a stable fit -- this is a statistical
+ceiling imposed by TNBC's reduced representation within TCGA-BRCA, not
+something a different modeling choice within this project could fix.
+Any future work drawing conclusions from the mutation-recurrence pathway
+should treat surviving candidates' effect sizes (hazard ratios) with real
+caution, given how few carriers/events typically support them.

@@ -12,8 +12,45 @@ end-to-end).
 
 ### Deferred (by design)
 
-- `feat/scoring-package`, `feat/validation`, `feat/drug-target-scoring`,
-  `feat/reporting`.
+- `feat/validation`, `feat/drug-target-scoring`, `feat/reporting`.
+
+## [0.3.0] - 2026-07-20
+
+Composite biomarker scoring package working end-to-end against the real
+preprocessed cohort -- this project's core novel, independently citable
+contribution.
+
+- `oncocartograph.scoring` — standalone package with zero cross-imports
+  from the rest of `oncocartograph`, mechanically enforced by
+  `tests/scoring/test_decoupling.py`.
+- Two distinct, explicitly typed candidate-generation pathways feed the
+  same composite score, per the v0.2.0 finding that MOFA+ contributes
+  ~0% variance to the mutation view: `IntegrationEvidence` (MOFA+ factor
+  loading, for RNA-seq/methylation/CNV) and `RecurrenceEvidence`
+  (mutation prevalence + optional Fisher's-exact categorical
+  association), both scored via identical `SurvivalEvidence` (univariate
+  Cox PH, continuous or binary covariate).
+- Cox PH on overall survival, not Fine-Gray competing-risks — confirmed
+  as a data-availability constraint (no cause-of-death/recurrence coding
+  in the real TCGA-BRCA clinical file), not a stylistic choice.
+- `composite_biomarker_score` renormalizes weights over whichever
+  evidence axes are present, so a mutation candidate is never penalized
+  for lacking `IntegrationEvidence`. `DruggabilityEvidence` is schema-only
+  here; `feat/drug-target-scoring` populates real values.
+- Fixed a real bug caught by running the real 143-patient survival
+  screen: lifelines can return a "successful" Cox fit with non-finite
+  summary statistics (NaN, or an infinite confidence bound) for sparse
+  binary covariates whose mutated subgroup has too few of the cohort's
+  16 events. An initial NaN-only check caught 92/845 (~11%) of
+  recurrence-filtered mutation genes; broadening to `np.isfinite` caught
+  the true rate: 712/845 (84%).
+- **Real scoring run (2026-07-20):** 709 candidates screened (576
+  MOFA+-derived + 133 mutation-derived). 0 survived FDR correction — the
+  expected honest outcome of screening hundreds of candidates against
+  only 16 events, flagged as a limitation before this work package began.
+  Documented as hypothesis-generating, not confirmatory.
+- 30 new tests (135 total), 99% coverage, verified against the Python
+  3.11 target.
 
 ## [0.2.0] - 2026-07-20
 
