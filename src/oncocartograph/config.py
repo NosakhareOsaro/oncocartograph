@@ -32,6 +32,22 @@ class Settings(BaseSettings):
         gdc_request_timeout_seconds: Per-request timeout for GDC API calls.
         gdc_max_retries: Number of retries for transient GDC API failures
             (connection errors, 5xx responses) before giving up.
+        open_targets_api_base_url: Base URL for the Open Targets GraphQL
+            API (https://api.platform.opentargets.org/api/v4/graphql).
+        open_targets_batch_size: Number of targets requested per
+            ``targets(ensemblIds: ...)``/``mapIds`` GraphQL call.
+        open_targets_request_timeout_seconds: Per-request timeout for
+            Open Targets API calls.
+        open_targets_max_retries: Number of retries for transient Open
+            Targets API failures before giving up.
+        chembl_api_base_url: Base URL for the ChEMBL REST API
+            (https://www.ebi.ac.uk/chembl/api/data).
+        chembl_batch_size: Number of identifiers requested per batched
+            ChEMBL ``__in`` filter call.
+        chembl_request_timeout_seconds: Per-request timeout for ChEMBL
+            API calls.
+        chembl_max_retries: Number of retries for transient ChEMBL API
+            failures before giving up.
     """
 
     model_config = SettingsConfigDict(
@@ -48,6 +64,18 @@ class Settings(BaseSettings):
     gdc_page_size: int = Field(default=100, gt=0, le=2000)
     gdc_request_timeout_seconds: float = Field(default=30.0, gt=0)
     gdc_max_retries: int = Field(default=3, ge=0)
+
+    open_targets_api_base_url: str = Field(
+        default="https://api.platform.opentargets.org/api/v4/graphql"
+    )
+    open_targets_batch_size: int = Field(default=50, gt=0, le=200)
+    open_targets_request_timeout_seconds: float = Field(default=30.0, gt=0)
+    open_targets_max_retries: int = Field(default=3, ge=0)
+
+    chembl_api_base_url: str = Field(default="https://www.ebi.ac.uk/chembl/api/data")
+    chembl_batch_size: int = Field(default=50, gt=0, le=200)
+    chembl_request_timeout_seconds: float = Field(default=30.0, gt=0)
+    chembl_max_retries: int = Field(default=3, ge=0)
 
     @property
     def raw_data_dir(self) -> Path:

@@ -18,6 +18,12 @@ def test_settings_defaults() -> None:
     assert settings.gdc_page_size == 100
     assert settings.gdc_request_timeout_seconds == 30.0
     assert settings.gdc_max_retries == 3
+    assert (
+        settings.open_targets_api_base_url == "https://api.platform.opentargets.org/api/v4/graphql"
+    )
+    assert settings.open_targets_batch_size == 50
+    assert settings.chembl_api_base_url == "https://www.ebi.ac.uk/chembl/api/data"
+    assert settings.chembl_batch_size == 50
 
 
 def test_gdc_page_size_must_be_positive() -> None:

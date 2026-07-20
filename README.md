@@ -104,8 +104,29 @@ variance to any factor (≤0.003%), so mutation-derived biomarkers will
 need direct statistics rather than MOFA+ loadings. Full breakdown in
 `docs/methods.md` §3.4.
 
-Scoring and validation results are pending those work packages — no
-placeholder figures are included here.
+**Composite scoring (2026-07-20):** 709 candidates screened against real
+survival data (16 events). 0 survived FDR correction — expected given the
+event count, documented as hypothesis-generating not confirmatory.
+Running the real screen caught a genuine bug: lifelines can return
+non-finite Cox statistics for sparse binary covariates, affecting 84%
+(712/845) of mutation candidates, not the ~11% an initial NaN-only check
+found. Full breakdown in `docs/methods.md` §4.4.
+
+**Druggability evidence (2026-07-20):** real Open Targets + ChEMBL
+evidence populated for 480/480 (100%) RNA-seq/copy-number/mutation
+candidates (methylation's CpG-probe candidates deferred — need a
+probe-to-gene mapping out of scope this iteration). Adding druggability
+substantially reshuffled the ranking (Spearman ρ=0.656 vs. the
+druggability-absent ranking; only 4/20 previous top candidates remained
+in the top 20) — evidence the composite score does real work rather than
+just re-deriving the survival ranking. The mutation-derived `TP53`
+candidate ranked 7th overall, with real ChEMBL evidence
+(`max_phase=3.0`) reflecting its genuine drug development history — a
+candidate MOFA+ factor loadings could never have surfaced. Full
+breakdown in `docs/methods.md` §6.5.
+
+Validation results are pending that work package — no placeholder
+figures are included here.
 
 ## Reproducibility
 
