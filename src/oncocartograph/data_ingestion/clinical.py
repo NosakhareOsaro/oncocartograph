@@ -35,6 +35,19 @@ RECEPTOR_STATUS_COLUMNS = (
     "her2_fish_status",
 )
 
+#: Clinical columns required to derive overall-survival duration/event
+#: (see :func:`derive_survival_outcome`). Confirmed against the real
+#: downloaded clinical file (column names match exactly).
+SURVIVAL_COLUMNS = (
+    "bcr_patient_uuid",
+    "vital_status",
+    "death_days_to",
+    "last_contact_days_to",
+)
+
+#: The ``vital_status`` value indicating the death event was observed.
+_DEAD = "Dead"
+
 
 def read_biotab(path: Path, *, metadata_rows: int = BIOTAB_METADATA_ROWS) -> pd.DataFrame:
     """Read a BCR Biotab tab-delimited clinical file into a DataFrame.
@@ -76,3 +89,70 @@ def extract_receptor_status(clinical: pd.DataFrame) -> pd.DataFrame:
             "column layout may need updating against the real downloaded file."
         )
     return clinical[list(RECEPTOR_STATUS_COLUMNS)].copy()
+
+
+def _to_days_or_none(value: object) -> float | None:
+    """Coerce a raw clinical day-count field to float.
+
+    Args:
+        value: A raw ``death_days_to``/``last_contact_days_to`` value,
+            which may already be numeric-looking text or a TCGA sentinel
+            string (e.g. ``"[Not Available]"``).
+
+    Returns:
+        The value as a float, or ``None`` if it cannot be parsed as one.
+    """
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def derive_survival_outcome(clinical: pd.DataFrame) -> pd.DataFrame:
+    """Derive overall-survival duration and event indicators from raw clinical fields.
+
+    Cox PH on overall survival is the only model TCGA-BRCA's clinical file
+    supports (see ``docs/adr/0007-survival-methodology-and-composite-score.md``);
+    this function produces the ``duration``/``event`` inputs
+    :func:`oncocartograph.scoring.survival.fit_univariate_cox` and
+    :func:`~oncocartograph.scoring.survival.screen_survival_associations`
+    expect.
+
+    Args:
+        clinical: A parsed clinical DataFrame (e.g. from :func:`read_biotab`)
+            with at least :data:`SURVIVAL_COLUMNS`.
+
+    Returns:
+        A DataFrame indexed by ``bcr_patient_uuid`` with ``duration``
+        (float days) and ``event`` (int 0/1) columns. ``duration`` is
+        ``death_days_to`` when the patient died (an observed event), else
+        ``last_contact_days_to`` (censored at last contact). Patients
+        missing both day fields are dropped, since neither a duration nor
+        a censoring time is available for them.
+
+    Raises:
+        KeyError: If any of :data:`SURVIVAL_COLUMNS` is missing.
+    """
+    missing = [c for c in SURVIVAL_COLUMNS if c not in clinical.columns]
+    if missing:
+        raise KeyError(f"clinical DataFrame is missing required survival columns: {missing}")
+
+    death_days = clinical["death_days_to"].apply(_to_days_or_none)
+    last_contact_days = clinical["last_contact_days_to"].apply(_to_days_or_none)
+    duration = death_days.fillna(last_contact_days)
+    event = (clinical["vital_status"] == _DEAD).astype(int)
+
+    # Built positionally (via .to_numpy()), not by passing `index=` to the
+    # DataFrame constructor alongside Series that still carry the original
+    # RangeIndex -- doing so silently reindexes duration/event against the
+    # bcr_patient_uuid labels (which don't match integer positions),
+    # producing an all-NaN result. Caught while writing this function's
+    # first test.
+    outcome = pd.DataFrame(
+        {
+            "bcr_patient_uuid": clinical["bcr_patient_uuid"].to_numpy(),
+            "duration": duration.to_numpy(),
+            "event": event.to_numpy(),
+        }
+    ).set_index("bcr_patient_uuid")
+    return outcome.dropna(subset=["duration"])

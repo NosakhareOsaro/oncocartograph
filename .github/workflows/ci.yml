@@ -15,9 +15,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e ".[dev]"
-      - run: ruff check src tests
-      - run: black --check src tests
+      - run: pip install -e ".[dev,workflow]"
+      - run: ruff check src tests workflows/scripts
+      - run: black --check src tests workflows/scripts
 
   typecheck:
     name: Type check (mypy)
@@ -27,8 +27,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,workflow]"
       - run: mypy src
+      - run: mypy workflows/scripts --strict
 
   test:
     name: Test (pytest)
@@ -54,5 +55,18 @@ jobs:
         run: |
           test -f docs/methods.md
           test -f docs/data_sources.md
+          test -f docs/manuscript.md
+          test -f docs/global_talent_evidence.md
           test -f README.md
           test -f CITATION.cff
+
+  workflow-dag:
+    name: Validate Snakemake DAG (dry-run, no data/network required)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev,workflow]"
+      - run: snakemake -s workflows/Snakefile --cores 1 -n all

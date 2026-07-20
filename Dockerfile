@@ -10,8 +10,9 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY tests ./tests
+COPY workflows ./workflows
 
 RUN pip install --upgrade pip \
-    && pip install -e ".[dev]"
+    && pip install -e ".[dev,workflow]"
 
 CMD ["pytest"]

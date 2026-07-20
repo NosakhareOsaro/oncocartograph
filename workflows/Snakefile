@@ -1,0 +1,151 @@
+"""OncoCartograph pipeline DAG.
+
+Wires the tested oncocartograph.* library functions (via the thin
+scripts/ wrappers) into one reproducible end-to-end pipeline: GDC/GEO/
+Open Targets/ChEMBL ingestion -> preprocessing -> MOFA+ integration ->
+composite scoring -> druggability -> external validation.
+
+Run the whole pipeline:
+    snakemake -s workflows/Snakefile --cores 1 all
+
+Dry-run to inspect the DAG without executing anything:
+    snakemake -s workflows/Snakefile --cores 1 -n all
+"""
+
+configfile: "workflows/config.yaml"
+
+DATA_DIR = config["data_dir"]
+PROCESSED = f"{DATA_DIR}/processed"
+EXTERNAL = f"{DATA_DIR}/external/gse96058"
+
+OMICS_LAYERS = ["rna_seq", "methylation", "copy_number", "mutation"]
+
+wildcard_constraints:
+    layer="|".join(OMICS_LAYERS),
+
+
+rule all:
+    input:
+        f"{PROCESSED}/composite_scores.csv",
+        f"{PROCESSED}/gse96058_replication_table.csv",
+
+
+rule ingest_cohort:
+    output:
+        cohort=f"{PROCESSED}/tnbc_cohort.csv",
+        audit=f"{PROCESSED}/tnbc_cohort_audit.csv",
+        case_ids=f"{PROCESSED}/tnbc_case_ids.csv",
+        survival=f"{PROCESSED}/survival.csv",
+    shell:
+        "python workflows/scripts/ingest_cohort.py --config workflows/config.yaml"
+
+
+rule ingest_omics:
+    input:
+        case_ids=f"{PROCESSED}/tnbc_case_ids.csv",
+    output:
+        manifest=f"{PROCESSED}/resolved_paths_{{layer}}.json",
+    shell:
+        "python workflows/scripts/ingest_omics.py --layer {wildcards.layer} "
+        "--config workflows/config.yaml"
+
+
+rule preprocess_rna_seq:
+    input:
+        manifest=f"{PROCESSED}/resolved_paths_rna_seq.json",
+    output:
+        view=f"{PROCESSED}/rna_seq_view.parquet",
+    shell:
+        "python workflows/scripts/preprocess_rna_seq.py --config workflows/config.yaml"
+
+
+rule preprocess_methylation:
+    input:
+        manifest=f"{PROCESSED}/resolved_paths_methylation.json",
+    output:
+        view=f"{PROCESSED}/methylation_view.parquet",
+    shell:
+        "python workflows/scripts/preprocess_methylation.py --config workflows/config.yaml"
+
+
+rule preprocess_copy_number:
+    input:
+        manifest=f"{PROCESSED}/resolved_paths_copy_number.json",
+    output:
+        view=f"{PROCESSED}/copy_number_view.parquet",
+    shell:
+        "python workflows/scripts/preprocess_copy_number.py --config workflows/config.yaml"
+
+
+rule preprocess_mutation:
+    input:
+        manifest=f"{PROCESSED}/resolved_paths_mutation.json",
+    output:
+        view=f"{PROCESSED}/mutation_view.parquet",
+    shell:
+        "python workflows/scripts/preprocess_mutation.py --config workflows/config.yaml"
+
+
+rule integrate_mofa:
+    input:
+        rna_seq=f"{PROCESSED}/rna_seq_view.parquet",
+        methylation=f"{PROCESSED}/methylation_view.parquet",
+        copy_number=f"{PROCESSED}/copy_number_view.parquet",
+        mutation=f"{PROCESSED}/mutation_view.parquet",
+    output:
+        model=f"{PROCESSED}/mofa_model.hdf5",
+        factors=f"{PROCESSED}/mofa_factor_values.csv",
+        variance=f"{PROCESSED}/mofa_variance_explained.csv",
+    shell:
+        "python workflows/scripts/integrate_mofa.py --config workflows/config.yaml"
+
+
+rule score_candidates:
+    input:
+        model=f"{PROCESSED}/mofa_model.hdf5",
+        mutation=f"{PROCESSED}/mutation_view.parquet",
+        survival=f"{PROCESSED}/survival.csv",
+    output:
+        evidence=f"{PROCESSED}/candidate_evidence.csv",
+    shell:
+        "python workflows/scripts/score_candidates.py --config workflows/config.yaml"
+
+
+rule score_druggability:
+    input:
+        evidence=f"{PROCESSED}/candidate_evidence.csv",
+    output:
+        scores=f"{PROCESSED}/composite_scores.csv",
+    shell:
+        "python workflows/scripts/score_druggability.py --config workflows/config.yaml"
+
+
+rule ingest_gse96058:
+    output:
+        clinical=expand(
+            f"{EXTERNAL}/{{filename}}",
+            filename=[
+                "GSE96058-GPL11154_series_matrix.txt.gz",
+                "GSE96058-GPL18573_series_matrix.txt.gz",
+            ],
+        ),
+        expression=f"{EXTERNAL}/GSE96058_gene_expression_3273_samples_and_136_replicates_transformed.csv.gz",
+    shell:
+        "python workflows/scripts/ingest_gse96058.py --config workflows/config.yaml"
+
+
+rule validate_external:
+    input:
+        evidence=f"{PROCESSED}/candidate_evidence.csv",
+        clinical=expand(
+            f"{EXTERNAL}/{{filename}}",
+            filename=[
+                "GSE96058-GPL11154_series_matrix.txt.gz",
+                "GSE96058-GPL18573_series_matrix.txt.gz",
+            ],
+        ),
+        expression=f"{EXTERNAL}/GSE96058_gene_expression_3273_samples_and_136_replicates_transformed.csv.gz",
+    output:
+        replication=f"{PROCESSED}/gse96058_replication_table.csv",
+    shell:
+        "python workflows/scripts/validate_external.py --config workflows/config.yaml"

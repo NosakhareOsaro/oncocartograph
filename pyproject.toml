@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "oncocartograph"
-version = "0.4.0"
+version = "1.0.0"
 description = "Multi-omics integration and druggable biomarker prioritisation for triple-negative breast cancer (TCGA-BRCA TNBC)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -43,6 +43,12 @@ dev = [
     "types-requests>=2.31",
     "pandas-stubs>=2.2",
     "scipy-stubs>=1.11",
+    "types-PyYAML>=6.0",
+]
+workflow = [
+    "snakemake>=8.0",
+    "pyyaml>=6.0",
+    "pyarrow>=15.0",
 ]
 
 [tool.hatch.build.targets.wheel]
