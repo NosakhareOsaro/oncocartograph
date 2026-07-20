@@ -10,9 +10,36 @@ end-to-end).
 
 ## [Unreleased]
 
+Drug-target/druggability evidence working end-to-end against the real
+709-candidate set. Not assigned its own milestone version in the
+original scheme (which jumps v0.3.0 scoring package → v0.4.0 external
+validation) — see commit/PR history for full detail until a version
+number is assigned.
+
+- `oncocartograph.drug_targets` — Open Targets GraphQL client
+  (`mapIds` gene-symbol resolution, `targets` tractability + UniProt
+  accession lookup) and ChEMBL REST client (exact UniProt-accession
+  target resolution — free-text search confirmed unreliable — and
+  max clinical trial phase via the `mechanism` endpoint).
+- 3-tier tractability scoring (Approved Drug=1.0, clinical-stage=0.66,
+  any other evidence=0.33, none=0.0), combined with ChEMBL max phase via
+  `max(tier_score, max_phase/4)` into the `tractability_score` the
+  composite formula reads.
+- Methylation candidates (CpG probe IDs) explicitly deferred — need an
+  Illumina 450K manifest not in scope this iteration (ADR 0008).
+- **Real re-scoring run:** 480/480 comparable candidates got real
+  druggability evidence. Ranking changed substantially (Spearman
+  ρ=0.656 vs. the druggability-absent ranking, only 4/20 previous top
+  candidates remained in the top 20) — the mutation-derived `TP53`
+  candidate ranked 7th overall with real ChEMBL evidence
+  (`max_phase=3.0`), a candidate MOFA+ could never have surfaced.
+- 38 new tests (173 total), 100% coverage on all new modules, verified
+  against the Python 3.11 target and against the real live APIs (not
+  just mocked HTTP) before each commit.
+
 ### Deferred (by design)
 
-- `feat/validation`, `feat/drug-target-scoring`, `feat/reporting`.
+- `feat/validation`, `feat/reporting`.
 
 ## [0.3.0] - 2026-07-20
 
