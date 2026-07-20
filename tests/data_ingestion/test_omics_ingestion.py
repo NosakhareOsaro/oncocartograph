@@ -42,11 +42,18 @@ def test_rna_seq_filter_restricts_to_project_cases_and_star_counts() -> None:
 
 
 def test_methylation_filter_restricts_to_450k_platform() -> None:
-    """The methylation filter must scope to the 450K platform specifically."""
+    """The methylation filter must scope to the 450K platform and processed beta values only.
+
+    Without the data_type constraint, GDC also returns raw .idat intensity
+    files under the same data_category/platform -- a real bug found by
+    running the live pull (see git history), which wasted ~1.8GB pulling
+    files this pipeline never uses.
+    """
     filters = methylation_file_filter(_CASE_IDS)
 
     assert _filter_field_values(filters, "data_category") == ["DNA Methylation"]
     assert _filter_field_values(filters, "platform") == ["Illumina Human Methylation 450"]
+    assert _filter_field_values(filters, "data_type") == ["Methylation Beta Value"]
 
 
 def test_copy_number_filter_restricts_to_gene_level_copy_number() -> None:
