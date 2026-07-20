@@ -114,8 +114,7 @@ def _call_her2(raw_ihc_value: object, raw_fish_value: object) -> tuple[ReceptorC
             return "Positive", None
         return (
             "Indeterminate",
-            "HER2 IHC equivocal with no FISH follow-up recorded "
-            f"(her2_fish_status={fish_value!r})",
+            f"HER2 IHC equivocal, not resolved by FISH (her2_fish_status={fish_value!r})",
         )
     return "Indeterminate", f"HER2 IHC status missing or indeterminate ({ihc_value!r})"
 

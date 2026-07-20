@@ -74,7 +74,8 @@ def test_her2_equivocal_with_no_fish_is_indeterminate_not_negative() -> None:
     decision = classify_patient("Negative", "Negative", "Equivocal", None)
     assert decision.is_tnbc is False
     assert decision.exclusion_reason is not None
-    assert "no FISH follow-up" in decision.exclusion_reason
+    assert "not resolved by FISH" in decision.exclusion_reason
+    assert "her2_fish_status=None" in decision.exclusion_reason
 
 
 @pytest.mark.parametrize("missing_value", [None, math.nan, "", "[Not Evaluated]", "Indeterminate"])
@@ -84,6 +85,19 @@ def test_er_missing_or_indeterminate_excludes(missing_value: object) -> None:
     assert decision.is_tnbc is False
     assert decision.exclusion_reason is not None
     assert "ER status missing or indeterminate" in decision.exclusion_reason
+
+
+def test_her2_equivocal_with_recorded_but_unresolving_fish_value_names_it() -> None:
+    """Real TCGA-BRCA data has her2_fish_status values like 'Equivocal' and
+    '[Not Evaluated]' -- both must be excluded, and the actual raw value must
+    appear in the reason rather than a phrasing that implies a specific one
+    of those (e.g. claiming "no FISH was recorded" when one was, just
+    unresolving)."""
+    decision = classify_patient("Negative", "Negative", "Equivocal", "Equivocal")
+    assert decision.is_tnbc is False
+    assert decision.exclusion_reason is not None
+    assert "not resolved by FISH" in decision.exclusion_reason
+    assert "her2_fish_status='Equivocal'" in decision.exclusion_reason
 
 
 def test_her2_ihc_missing_is_indeterminate() -> None:
@@ -100,7 +114,7 @@ def test_multiple_indeterminate_markers_combine_into_one_reason() -> None:
     assert decision.is_tnbc is False
     assert decision.exclusion_reason is not None
     assert "ER status missing or indeterminate" in decision.exclusion_reason
-    assert "no FISH follow-up" in decision.exclusion_reason
+    assert "not resolved by FISH" in decision.exclusion_reason
 
 
 def test_indeterminate_takes_precedence_over_positive() -> None:
