@@ -30,12 +30,13 @@ exists and has been run.
 | Accession | [GSE96058](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96058) |
 | Description | Sweden Cancerome Analysis Network—Breast (SCAN-B) RNA-seq cohort |
 | Platform | RNA-seq (Illumina HiSeq 2000 / NextSeq 500) |
-| N | ~3,273 samples total; TNBC subset defined by the same rules as Section 1.2 of `methods.md`, applied to whatever ER/PR/HER2 annotation fields GEO provides for this series (exact field mapping to be documented at ingestion time, since GEO metadata field names differ from GDC's) |
-| Survival | Overall survival, median follow-up ~52 months |
+| N | 3,409 total samples (3,273 primary + 136 technical replicates) across two platform-specific series-matrix files; TNBC subset via histopathology `er status`/`pgr status`/`her2 status` fields (all-negative, `"NA"` excluded), same rule as Section 1.2 of `methods.md` — real result: **N=143, 26 events** |
+| Survival | Overall survival (`overall survival days`/`overall survival event` fields), median follow-up ~52 months |
 | Associated publications | Saal et al. 2015, *Genome Med* 7:20 (cohort description); Brueffer et al. 2018, *JCO Precis Oncol* (biomarker classifiers) |
 | Why chosen over alternatives | See [`docs/adr/0003-external-validation-cohort.md`](adr/0003-external-validation-cohort.md) |
 | License | GEO public data, no restriction beyond standard NCBI terms |
-| Download date | _To be recorded once `feat/validation` ingests this series._ |
+| Files used | Series-matrix clinical files: `GSE96058-GPL11154_series_matrix.txt.gz` (HiSeq 2000), `GSE96058-GPL18573_series_matrix.txt.gz` (NextSeq 500). Expression matrix: `GSE96058_gene_expression_3273_samples_and_136_replicates_transformed.csv.gz` (~564MB; gene-symbol-indexed, log2(FPKM+0.1)-transformed), from `https://ftp.ncbi.nlm.nih.gov/geo/series/GSE96nnn/GSE96058/suppl/` |
+| Download date | 2026-07-20 |
 
 ## Published-hit reproduction benchmark
 
@@ -45,6 +46,7 @@ exists and has been run.
 | Reported hits used for comparison | Subtype-specific druggable targets: androgen receptor (AR) in the LAR subtype; recurrent PTEN/PI3K-pathway alterations across subtypes; immune-checkpoint gene expression in the BLIA subtype |
 | Cohort relationship to TCGA-BRCA | Independent (Baylor College of Medicine discovery/validation cohorts plus seven public TNBC datasets) — not a subset of TCGA-BRCA, so reproducing these hits from our TCGA-BRCA-derived pipeline is a genuine cross-cohort replication check |
 | License / access | Published paper; no raw data redistribution needed since we compare our own TCGA-derived findings against their *reported* gene/pathway-level conclusions |
+| Scope actually implemented | Reduced, with sign-off, from full LAR/MES/BLIS/BLIA subtype reproduction to a five-gene (AR, PTEN, CD274, PDCD1, CTLA4) directional-plausibility check against real GSE96058 survival evidence — see [`docs/adr/0009-external-replication-methodology-and-result.md`](adr/0009-external-replication-methodology-and-result.md). Real result: 5/5 markers plausible. |
 
 ## Drug/target evidence
 
