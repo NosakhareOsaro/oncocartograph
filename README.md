@@ -2,13 +2,13 @@
 
 **Integrative multi-omics biomarker prioritisation for triple-negative breast cancer (TNBC).**
 
-> **Status: early scaffolding.** The repository structure, CI, and package
-> skeleton are in place. The data ingestion, integration, scoring,
-> validation, and reporting pipeline stages are being built incrementally,
-> work package by work package (tracked via feature branches and PRs — see
-> `CHANGELOG.md`). This README will be updated with real results and
-> figures as each stage lands; sections below are marked explicitly where
-> content is still pending so nothing here misrepresents current progress.
+> **Status: pipeline complete, results honestly mixed.** All stages
+> (ingestion, preprocessing, MOFA+ integration, composite scoring,
+> druggability, external validation) are implemented, tested, and wired
+> into one real Snakemake DAG (`workflows/Snakefile`) — see Quickstart
+> below. The headline result is a **pre-registered external validation
+> that failed on its primary criterion**; see `docs/manuscript.md` for
+> the full write-up and Results below for the real numbers.
 
 ## Why TNBC, specifically
 
@@ -58,24 +58,48 @@ flowchart TD
 
 ## Quickstart
 
-> Pending `feat/data-ingestion` and subsequent work packages. Real, tested
-> commands will replace this section as each stage is implemented — see
-> `CHANGELOG.md` for current status.
-
 ```bash
 git clone https://github.com/NosakhareOsaro/oncocartograph.git
 cd oncocartograph
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,workflow]"
 pre-commit install
 pytest
+
+# Inspect the real pipeline DAG without running anything (no data/network needed):
+snakemake -s workflows/Snakefile --cores 1 -n all
+
+# Run the full pipeline end-to-end from raw GDC/GEO/Open Targets/ChEMBL
+# data (real network calls, a multi-GB download, and ~80s of MOFA+
+# training -- expect this to take a while on a clean checkout):
+snakemake -s workflows/Snakefile --cores 1 all
 ```
 
 ## Pipeline DAG
 
-Full DAG diagram (generated from the Snakemake workflow — see
-`docs/adr/0002-workflow-engine-choice.md`) will be added once
-`workflows/Snakefile` exists.
+Generated from the real `workflows/Snakefile` (one rule per stage, each
+calling tested `oncocartograph.*` library functions through a thin
+`workflows/scripts/` wrapper — see `docs/adr/0002-workflow-engine-choice.md`
+for why Snakemake). Regenerate the authoritative version yourself with
+`snakemake -s workflows/Snakefile --dag all | dot -Tpng > dag.png`.
+
+```mermaid
+flowchart TD
+    ingest_cohort --> ingest_omics
+    ingest_omics --> preprocess_rna_seq
+    ingest_omics --> preprocess_methylation
+    ingest_omics --> preprocess_copy_number
+    ingest_omics --> preprocess_mutation
+    preprocess_rna_seq --> integrate_mofa
+    preprocess_methylation --> integrate_mofa
+    preprocess_copy_number --> integrate_mofa
+    preprocess_mutation --> integrate_mofa
+    integrate_mofa --> score_candidates
+    preprocess_mutation --> score_candidates
+    score_candidates --> score_druggability
+    score_candidates --> validate_external
+    ingest_gse96058 --> validate_external
+```
 
 ## Results
 
@@ -141,12 +165,24 @@ limitation rather than reframed; full breakdown in `docs/methods.md` §5
 and ADR 0009. Per-candidate evidence:
 `data/processed/gse96058_replication_table.csv`.
 
+**Independent re-run via the real Snakemake pipeline (2026-07-20):**
+running the full DAG end-to-end a second time (`feat/reporting`, freshly
+re-derived from raw counts and a freshly-retrained MOFA+ model, not a
+cached artifact) reproduced the same conclusion with different exact
+numbers, as expected from MOFA+'s stochastic training: 39.8% concordance
+(vs. 41.3%), p=0.99 (vs. p=0.97), Burstein check still 5/5. The primary
+criterion's failure is not an artifact of one particular run.
+
 ## Reproducibility
 
 Every intermediate artifact is traceable to an exact source
 query/accession/download date (see `docs/data_sources.md`), and every
-stochastic step logs its random seed. Exact commands to regenerate every
-result from raw data will be listed here once the pipeline is complete.
+stochastic step logs its random seed. The full pipeline is a real,
+runnable Snakemake DAG (`workflows/Snakefile`, `workflows/config.yaml`) —
+see Quickstart above. `data/raw/`, `data/processed/`, and `data/external/`
+are gitignored (never commit raw/processed omics data); a clean checkout
+regenerates them from GDC/GEO/Open Targets/ChEMBL via
+`snakemake -s workflows/Snakefile --cores 1 all`.
 
 ## Documentation
 
