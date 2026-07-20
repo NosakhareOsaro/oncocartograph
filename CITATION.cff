@@ -9,6 +9,7 @@ authors:
     given-names: Nosakhare
     email: osaronosakhare@gmail.com
 license: MIT
+repository-code: "https://github.com/NosakhareOsaro/oncocartograph"
 keywords:
   - multi-omics
   - triple-negative breast cancer

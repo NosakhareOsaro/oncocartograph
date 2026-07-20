@@ -24,6 +24,10 @@ dependencies = [
     "pydeseq2>=0.4",
 ]
 
+[project.urls]
+Homepage = "https://github.com/NosakhareOsaro/oncocartograph"
+Repository = "https://github.com/NosakhareOsaro/oncocartograph"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

@@ -63,7 +63,7 @@ flowchart TD
 > `CHANGELOG.md` for current status.
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/NosakhareOsaro/oncocartograph.git
 cd oncocartograph
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
