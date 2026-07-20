@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from oncocartograph.data_ingestion.clinical import (
     RECEPTOR_STATUS_COLUMNS,
+    derive_survival_outcome,
     extract_receptor_status,
     read_biotab,
 )
@@ -66,3 +68,60 @@ def test_extract_receptor_status_raises_on_missing_column(synthetic_biotab_file:
 
     with pytest.raises(KeyError, match="her2_fish_status"):
         extract_receptor_status(table)
+
+
+def _survival_clinical() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "bcr_patient_uuid": "u1",
+                "vital_status": "Dead",
+                "death_days_to": "967",
+                "last_contact_days_to": "[Not Applicable]",
+            },
+            {
+                "bcr_patient_uuid": "u2",
+                "vital_status": "Alive",
+                "death_days_to": "[Not Applicable]",
+                "last_contact_days_to": "852",
+            },
+            {
+                "bcr_patient_uuid": "u3",
+                "vital_status": "Alive",
+                "death_days_to": "[Not Applicable]",
+                "last_contact_days_to": "[Not Available]",
+            },
+        ]
+    )
+
+
+def test_derive_survival_outcome_uses_death_days_for_events() -> None:
+    """A dead patient's duration must come from death_days_to, event=1."""
+    outcome = derive_survival_outcome(_survival_clinical())
+
+    assert outcome.loc["u1", "duration"] == 967.0
+    assert outcome.loc["u1", "event"] == 1
+
+
+def test_derive_survival_outcome_uses_last_contact_days_for_censored() -> None:
+    """A living patient's duration must come from last_contact_days_to, event=0."""
+    outcome = derive_survival_outcome(_survival_clinical())
+
+    assert outcome.loc["u2", "duration"] == 852.0
+    assert outcome.loc["u2", "event"] == 0
+
+
+def test_derive_survival_outcome_drops_patients_missing_both_day_fields() -> None:
+    """A patient with neither day field parseable must be dropped, not kept with NaN duration."""
+    outcome = derive_survival_outcome(_survival_clinical())
+
+    assert "u3" not in outcome.index
+    assert len(outcome) == 2
+
+
+def test_derive_survival_outcome_raises_on_missing_column() -> None:
+    """A clinical DataFrame missing a required survival column must fail loudly."""
+    clinical = _survival_clinical().drop(columns=["vital_status"])
+
+    with pytest.raises(KeyError, match="vital_status"):
+        derive_survival_outcome(clinical)
