@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "oncocartograph"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-omics integration and druggable biomarker prioritisation for triple-negative breast cancer (TCGA-BRCA TNBC)"
 readme = "README.md"
 license = { text = "MIT" }
