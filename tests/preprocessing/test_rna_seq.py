@@ -20,6 +20,7 @@ from oncocartograph.preprocessing.rna_seq import (
     filter_low_expression,
     normalize_and_vst,
     read_star_counts,
+    select_top_variable_genes,
 )
 
 _STAR_COUNTS_CONTENT = (
@@ -133,3 +134,28 @@ def test_normalize_and_vst_is_deterministic() -> None:
     vst_second = normalize_and_vst(counts)
 
     pd.testing.assert_frame_equal(vst_first, vst_second)
+
+
+def test_select_top_variable_genes_keeps_highest_variance() -> None:
+    """The n most variable genes (by variance across patients) must be kept, in variance order."""
+    matrix = pd.DataFrame(
+        {
+            "case-a": [0.0, 0.0, 0.0],
+            "case-b": [10.0, 1.0, 0.0],
+            "case-c": [-10.0, -1.0, 0.0],
+        },
+        index=["high_var", "mid_var", "zero_var"],
+    )
+
+    top = select_top_variable_genes(matrix, n=2)
+
+    assert list(top.index) == ["high_var", "mid_var"]
+
+
+def test_select_top_variable_genes_keeps_all_when_n_exceeds_row_count() -> None:
+    """Requesting more genes than exist must return all of them, not error."""
+    matrix = pd.DataFrame({"case-a": [1.0, 2.0]}, index=["g1", "g2"])
+
+    top = select_top_variable_genes(matrix, n=100)
+
+    assert len(top) == 2

@@ -105,3 +105,20 @@ def normalize_and_vst(counts: pd.DataFrame) -> pd.DataFrame:
         columns=samples_by_genes.columns,
     )
     return vst_values.T
+
+
+def select_top_variable_genes(matrix: pd.DataFrame, n: int) -> pd.DataFrame:
+    """Select the n most variable genes by variance across patients.
+
+    Args:
+        matrix: A gene x patient VST-transformed matrix.
+        n: Number of top-variable genes to keep. If ``matrix`` has fewer
+            than ``n`` rows, all rows are kept.
+
+    Returns:
+        The subset of rows with the highest variance, in descending order
+        of variance.
+    """
+    variances = matrix.var(axis=1, skipna=True)
+    top_genes = variances.sort_values(ascending=False).head(n).index
+    return matrix.loc[top_genes]
