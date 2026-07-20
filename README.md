@@ -79,9 +79,20 @@ Full DAG diagram (generated from the Snakemake workflow — see
 
 ## Results
 
-*Pending.* Populated once the integration, scoring, and validation work
-packages are complete. No placeholder figures or numbers are included here
-— this section will only ever show real pipeline output.
+**Cohort (live GDC pull, 2026-07-20, Data Release 45.0):** of 1,097
+TCGA-BRCA patients, **143 (13.0%) were classified as TNBC** under the
+ADR 0001 rules. 954 excluded — 737 receptor-positive, 196 with a missing/
+indeterminate IHC call, 21 HER2-equivocal-and-unresolved-by-FISH. Full
+breakdown in `docs/methods.md` §1.2.
+
+**Raw data ingested for the cohort:** 158 RNA-seq (STAR-Counts), 348
+methylation (450K), 426 copy number (gene-level), and 126 mutation
+(Masked Somatic Mutation) files — ~5.4 GB total, each with a checksummed
+provenance sidecar. File counts exceed 143 because several patients have
+multiple samples/aliquots; deduplication happens in `feat/preprocessing`.
+
+Integration, scoring, and validation results are pending those work
+packages — no placeholder figures are included here.
 
 ## Reproducibility
 

@@ -11,14 +11,17 @@ exists and has been run.
 | Field | Value |
 |---|---|
 | Project | TCGA-BRCA (Breast Invasive Carcinoma) |
-| Access | NCI Genomic Data Commons (GDC), open-tier harmonized data, via TCGAbiolinks |
-| RNA-seq | GDC harmonized STAR-Counts workflow |
-| DNA methylation | Illumina Infinium HumanMethylation450 (450K) |
-| Copy number | GISTIC2 thresholded calls (source: Broad Firehose or GDC — final choice logged at ingestion time) |
-| Somatic mutation | MC3 public MAF |
-| Clinical / receptor status | TCGA-BRCA clinical supplement + TCGA-CDR (Liu et al. 2018, PMID 29625055) |
+| Access | NCI Genomic Data Commons (GDC) REST API, open-tier harmonized data, queried directly (see ADR 0004 — no TCGAbiolinks/R dependency) |
+| GDC data release at time of pull | Data Release 45.0 (2025-12-04), API commit `8f7c2a51ab0084b216ad1b62a3fae8b945439c53` |
+| Clinical / receptor status source file | `nationwidechildrens.org_clinical_patient_brca.txt` (BCR Biotab, `data_type=Clinical Supplement`), GDC file UUID `8162d394-8b64-4da2-9f5b-d164c54b9608`, 1,097 patient rows |
+| **TNBC cohort N (live pull, 2026-07-20)** | **143** of 1,097 TCGA-BRCA patients — see `docs/methods.md` §1.2 for the full exclusion breakdown and `data/processed/tnbc_cohort_audit.csv` for the per-patient audit table (gitignored; regenerate via `oncocartograph.data_ingestion.tnbc_cohort`) |
+| RNA-seq | GDC harmonized STAR-Counts workflow — 158 files, 763 MB, downloaded 2026-07-20 |
+| DNA methylation | Illumina Infinium HumanMethylation450 (450K) — 348 files, 3.2 GB, downloaded 2026-07-20 |
+| Copy number | GDC Gene Level Copy Number — 426 files, 1.4 GB, downloaded 2026-07-20 |
+| Somatic mutation | GDC Masked Somatic Mutation (MC3-derived) — 126 files, 6.0 MB, downloaded 2026-07-20 |
+| File counts exceeding cohort N | Expected: some patients have multiple samples/aliquots per omic layer (e.g. tumor + matched normal, multiple variant-calling pipelines for mutation data). Resolved during `feat/preprocessing` dedup, not during ingestion. |
+| Per-file provenance | One `<filename>.provenance.json` sidecar per downloaded file under `data/raw/{rna_seq,methylation,copy_number,mutation,clinical}/` (gitignored), each with a SHA-256 checksum, the exact GDC filter used, and download timestamp — this table is the human-readable summary, the sidecars are authoritative. |
 | License | GDC open-tier data usage policy (no additional restriction beyond standard TCGA open access terms) |
-| Exact file UUIDs / query parameters / download date | _To be recorded here by the ingestion script's provenance log once `feat/data-ingestion` runs — this table will be replaced with the actual GDC query manifest, not summarised by hand._ |
 
 ## External validation cohort: GEO GSE96058 (SCAN-B)
 

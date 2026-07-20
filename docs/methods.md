@@ -41,10 +41,39 @@ and the resulting include/exclude decision, so the final cohort N is a
 verifiable consequence of documented rules rather than an opaque filter.
 
 **Sample-level rules:** primary tumour samples only (GDC sample type code
-`01`), one sample per patient. Expected resulting N is approximately
-150-200 (to be confirmed empirically once the ingestion script runs against
-current GDC data — this document will be updated with the exact N and the
-full exclusion breakdown once `feat/data-ingestion` lands).
+`01`), one sample per patient (classification operates at the patient
+level on the clinical supplement; per-omic sample deduplication happens in
+`feat/preprocessing`).
+
+**Empirical result (live pull, 2026-07-20, GDC Data Release 45.0):** of
+1,097 TCGA-BRCA patients in `nationwidechildrens.org_clinical_patient_brca.txt`,
+**143 (13.0%) were classified as TNBC.** Exclusion breakdown for the
+remaining 954:
+
+| Reason category | N |
+|---|---|
+| Receptor positive (ER and/or PR and/or HER2) | 737 |
+| ER and/or PR and/or HER2 IHC status missing/indeterminate (`[Not Evaluated]`, `[Not Available]`, `Indeterminate`) | 196 |
+| HER2 IHC equivocal, not resolved by FISH | 21 |
+| **Total excluded** | **954** |
+
+These three categories are mutually exclusive in this dataset (they sum
+exactly to 954) because indeterminacy always takes precedence over a
+receptor-positive verdict when both would otherwise apply (see
+`classify_patient`'s precedence rule, tested in
+`tests/data_ingestion/test_tnbc_cohort.py`). The authoritative per-patient
+breakdown, including the full raw field values behind every decision, is
+`data/processed/tnbc_cohort_audit.csv` (gitignored; regenerable from the
+source clinical file via
+`oncocartograph.data_ingestion.tnbc_cohort.build_tnbc_cohort_audit`).
+
+This confirmed a real accuracy issue in the initial implementation: 3
+patients have `her2_fish_status="Equivocal"` (a FISH result *was* recorded,
+it just didn't resolve the case) rather than a missing value, and the
+original exclusion message wrongly implied no FISH had been attempted.
+Fixed before this pull's numbers were finalized (see git history for
+`oncocartograph.data_ingestion.tnbc_cohort`) — the classification outcome
+was unaffected, only the audit message's accuracy.
 
 ### 1.3 Rationale for this specific rule set
 
