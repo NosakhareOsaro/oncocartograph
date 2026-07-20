@@ -51,8 +51,11 @@ exists and has been run.
 | Field | Value |
 |---|---|
 | Open Targets | Public GraphQL API, `https://api.platform.opentargets.org/api/v4/graphql` — no API key required for the request volumes this project needs |
+| Open Targets queries used | `mapIds` (gene symbol → Ensembl ID, mutation candidates only); `targets(ensemblIds: ...)` for `tractability` (28 boolean buckets, 4 modalities) and `proteinIds` (canonical `uniprot_swissprot` accession) |
 | ChEMBL | Public REST API, `https://www.ebi.ac.uk/chembl/api/data` |
-| Exact query parameters and response snapshot dates | _To be recorded once `feat/drug-target-scoring` lands, since API responses can change over time and every score must be traceable to a specific query date._ |
+| ChEMBL queries used | `target.json?target_components__accession__in=...&target_type=SINGLE PROTEIN` (exact UniProt accession → ChEMBL target ID — free-text search confirmed unreliable, e.g. "TP53" search returns "TP53-binding protein 1" first); `mechanism.json?target_chembl_id__in=...` (max `max_phase` across all mechanism records per target) |
+| Coverage | RNA-seq/copy-number (Ensembl ID) and mutation (gene symbol) candidates only. Methylation (CpG probe ID) candidates are out of scope this iteration — see [`docs/adr/0008-druggability-evidence-sources.md`](adr/0008-druggability-evidence-sources.md) |
+| Query date | 2026-07-20 (`feat/drug-target-scoring`). API responses can change over time; re-running the pipeline will reflect the Open Targets/ChEMBL data current at that time, not this snapshot. |
 
 ## Provenance logging convention
 

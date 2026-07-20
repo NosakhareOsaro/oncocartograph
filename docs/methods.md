@@ -405,9 +405,72 @@ subtype-specific druggable target calls, once `feat/validation` lands._
 
 ## 6. Drug-target evidence and prioritisation
 
-_Pending — will document the Open Targets and ChEMBL query strategy and
-tractability/bioactivity evidence weighting once
-`feat/drug-target-scoring` lands._
+Implemented in `oncocartograph.drug_targets`, which imports from (but is
+not imported by) `oncocartograph.scoring` — the scoring package's
+zero-cross-import guarantee (§4) is one-directional.
+
+### 6.1 Identifier resolution
+
+Three candidate identifier types exist in this project's real candidate
+set, requiring different resolution:
+
+- **RNA-seq/copy number** (versioned Ensembl IDs, e.g.
+  `ENSG00000172551.11`): version suffix stripped, used directly.
+- **Mutation** (gene symbols, e.g. `GTF3C1`): batch-resolved to Ensembl
+  IDs via Open Targets' `mapIds` query, confirmed to return an empty hit
+  list (not an error) for an unresolvable symbol.
+- **Methylation** (CpG probe IDs, e.g. `cg00000029`): **out of scope for
+  this work package.** Probe IDs are not gene identifiers; mapping to a
+  nearest/associated gene needs the Illumina 450K manifest, a new
+  reference dataset not part of any prior work package (see
+  [`docs/adr/0008-druggability-evidence-sources.md`](adr/0008-druggability-evidence-sources.md)).
+  Methylation candidates retain `druggability=None` (renormalized away)
+  until this is addressed.
+
+### 6.2 Open Targets tractability
+
+Open Targets' GraphQL `targets(ensemblIds: ...)` query returns ~28
+boolean tractability buckets per target across four modalities (SM=Small
+Molecule, AB=Antibody, PR=PROTAC, OC=Other Clinical) — confirmed via live
+queries against real targets (TP53, GTF3C1) before any code was written.
+Collapsed to a single [0, 1] score via a 3-tier scheme (identical
+bucket-label text across modalities means this only needs to inspect the
+label, not a per-modality table):
+
+| Condition | Score |
+|---|---|
+| Approved Drug true, any modality | 1.0 |
+| Advanced Clinical or Phase 1 Clinical true, any modality | 0.66 |
+| Any other bucket true | 0.33 |
+| No bucket true | 0.0 |
+
+### 6.3 ChEMBL max clinical phase
+
+ChEMBL's free-text target search is unreliable for exact gene matching
+(confirmed: searching "TP53" returns "TP53-binding protein 1" as the top
+hit). Targets are instead resolved by exact UniProt accession match
+(`target_components__accession__in`, restricted to
+`target_type=SINGLE PROTEIN`), using the canonical `uniprot_swissprot`
+accession from Open Targets' `proteinIds` (filtering out non-canonical
+TrEMBL entries, which are returned alongside it). The maximum `max_phase`
+(0-4) across all of ChEMBL's `mechanism` records for that target is used
+— real data has multiple mechanism records per target with different
+phases (confirmed: TP53 shows both phase 2 and phase 3 records), so a
+max, not first-or-last, aggregation is required.
+
+### 6.4 Combining into `tractability_score`
+
+`max(tractability_tier_score, chembl_max_phase / 4)` — either signal
+alone can indicate a real drug exists or is in development, so this
+project takes the stronger rather than averaging them down.
+`chembl_max_phase` is retained on `DruggabilityEvidence` separately for
+transparent reporting even though the composite formula (§4.3) reads
+only the combined `tractability_score`.
+
+### 6.5 Re-scoring result with all three evidence axes
+
+_To be filled in after re-running the composite scoring screen on the
+real 709-candidate set with druggability evidence populated._
 
 ## 7. Software and versions
 
