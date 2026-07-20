@@ -10,4 +10,4 @@ See ``docs/methods.md`` for the full methodology and ``docs/data_sources.md``
 for exact dataset accessions and versions used.
 """
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0"
