@@ -12,6 +12,34 @@ own number.
 
 ## [Unreleased]
 
+External validation against GSE96058 (SCAN-B), a real independent RNA-seq
+TNBC cohort.
+
+- `oncocartograph.validation` — GSE96058 series-matrix clinical parser,
+  TNBC sub-cohort classifier (real result: N=143, 26 events), a
+  streaming gene-symbol-filtered reader for the ~564MB expression
+  matrix, a pre-registered direction-concordance replication test, and
+  a Burstein et al. (2015) known-biology plausibility check
+  (scope-reduced from full LAR/MES/BLIS/BLIA subtyping, confirmed with
+  sign-off).
+- Pre-registered the primary success/failure criterion — one-sided
+  exact binomial test on direction concordance vs. chance, alpha=0.05 —
+  before running the real analysis, specifically so it could not be
+  redefined after seeing the result (ADR 0009).
+- **Real result, reported honestly: the primary criterion FAILED.**
+  45/109 (41.3%) TCGA candidates were direction-concordant in GSE96058,
+  below the 50% chance rate (p=0.973). Consistent with
+  `feat/scoring-package`'s already-documented 0/709 FDR-significant
+  screen. The Burstein plausibility check passed 5/5 (AR, PTEN, CD274,
+  PDCD1, CTLA4 all directionally consistent with the literature) — a
+  real but separate result that does not offset the primary null
+  finding. Documented as a limitation, not reframed.
+- Per-candidate replication table persisted at
+  `data/processed/gse96058_replication_table.csv`.
+- 30 new tests, 100% coverage on all new modules, verified against the
+  Python 3.11 target and the real live Open Targets API and real
+  downloaded GEO data before each commit.
+
 ## [0.3.1] - 2026-07-20
 
 Drug-target/druggability evidence working end-to-end against the real
