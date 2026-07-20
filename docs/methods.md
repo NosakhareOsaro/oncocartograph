@@ -467,10 +467,59 @@ project takes the stronger rather than averaging them down.
 transparent reporting even though the composite formula (§4.3) reads
 only the combined `tractability_score`.
 
-### 6.5 Re-scoring result with all three evidence axes
+### 6.5 Re-scoring result with all three evidence axes (2026-07-20)
 
-_To be filled in after re-running the composite scoring screen on the
-real 709-candidate set with druggability evidence populated._
+Re-ran composite scoring on the 480 RNA-seq/copy-number/mutation
+candidates from §4.4 (methylation's 229 candidates excluded per §6.1's
+scope decision) with real Open Targets + ChEMBL druggability evidence
+populated for **480/480 (100%)** — a large improvement over §4.4's run,
+where druggability was absent and renormalized away for every single
+candidate.
+
+**The ranking changed substantially, not marginally:** Spearman
+correlation between the before- and after-druggability rankings is
+ρ=0.656 (480 candidates, p=1.8×10⁻⁶⁰) — positive and significant, but far
+from 1.0. Only **4 of the previous top 20 candidates remained in the top
+20** once druggability was added (16/20 displaced); at the top 50, 22/50
+(44%) were displaced. Mean absolute rank change across all 480 candidates
+was ~78 positions (out of 480, i.e. ~16% of the full list).
+
+**Two clear, explainable patterns drove the reshuffling:**
+
+1. **Candidates with weak survival evidence but strong real druggability
+   jumped sharply.** The single biggest mover, `rna_seq:ENSG00000050555.19`,
+   went from rank 469.5→53 (Δ=+416.5) — its survival signal alone was
+   negligible (composite score 0.0002 before), but real druggability
+   evidence (an existing approved/late-phase drug) pulled it into the top
+   quarter once that 0.35-weight axis was no longer renormalized away.
+   Several other candidates showed the same pattern (Δ>390 positions).
+2. **Candidates with moderate survival/selection-pathway evidence but no
+   real druggability dropped sharply.** A cluster of copy-number
+   candidates sharing one genomic segment (the same shared-loading
+   pattern noted in §3.4) dropped from rank 64→351.5 (Δ=−287.5) once
+   their actual (weak) druggability evidence was factored in at full
+   weight rather than excluded.
+
+**A real, biologically sensible result:** the mutation-derived `TP53`
+candidate — bypassing MOFA+ entirely per this project's two-pathway
+architecture (§4.1) — ranked **7th overall** (composite score 0.466),
+with `tractability_score=0.75` and `chembl_max_phase=3.0`, both
+reflecting TP53's genuine, well-documented drug development history
+(confirmed directly against the real ChEMBL API in §6.3). This is exactly
+the kind of candidate the mutation-recurrence pathway was designed to
+surface, since MOFA+ factor loadings could never have found it (§3.4:
+mutation view contributed ≤0.003% variance to every factor).
+
+**Interpretation:** this reshuffling is evidence the composite score is
+doing real work, not just re-deriving the survival ranking with cosmetic
+reweighting — a substantial fraction of top candidates are only
+"top" once actionability (does a real drug exist or is one in
+development) is considered alongside statistical association. Given
+§4.4's honest finding that 0 candidates reached FDR-corrected
+significance, this ranking should still be read as hypothesis-generating:
+druggability evidence changes *which* statistically-modest associations
+are worth following up on, not the underlying statistical confidence in
+any of them.
 
 ## 7. Software and versions
 
