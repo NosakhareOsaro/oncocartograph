@@ -1,8 +1,8 @@
 """Per-omic GDC file discovery and download for the TCGA-BRCA TNBC cohort.
 
 Builds the GDC filter expressions for each omic layer used in this project
-(RNA-seq STAR-Counts, Illumina 450K methylation, GISTIC2 thresholded copy
-number, MC3 public MAF -- see ``docs/data_sources.md``), restricted to a
+(RNA-seq STAR-Counts, Illumina 450K methylation, gene-level copy number,
+MC3 public MAF -- see ``docs/data_sources.md``), restricted to a
 given set of case UUIDs (the TNBC cohort selected by
 ``oncocartograph.data_ingestion.tnbc_cohort``), and downloads the matching
 files with a provenance record per file.
@@ -99,7 +99,12 @@ def methylation_file_filter(case_ids: Sequence[str]) -> dict[str, Any]:
 
 
 def copy_number_file_filter(case_ids: Sequence[str]) -> dict[str, Any]:
-    """GDC filter for GISTIC2 thresholded copy number files.
+    """GDC filter for gene-level copy number files.
+
+    These report absolute integer total copy number per gene, not
+    GISTIC2 thresholded categorical calls as originally assumed --
+    confirmed against real downloaded files, see
+    ``docs/adr/0005-copy-number-workflow-and-transform.md``.
 
     Args:
         case_ids: GDC case UUIDs to restrict the query to.
