@@ -1,0 +1,11 @@
+services:
+  oncocartograph:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+      - ./docs:/app/docs
+    environment:
+      - ONCOCARTOGRAPH_DATA_DIR=/app/data
+    command: ["pytest"]
