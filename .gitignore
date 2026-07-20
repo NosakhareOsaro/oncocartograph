@@ -51,3 +51,6 @@ site/
 work/
 .nextflow/
 .nextflow.log*
+
+# --- Local Claude Code session state (not project source) ---
+.claude/
