@@ -19,6 +19,7 @@ from oncocartograph.preprocessing.copy_number import (
     read_gene_level_copy_number,
     relative_log2_copy_number,
     resolve_copy_number_files,
+    select_top_variable_genes,
     workflow_priority_tie_break,
 )
 
@@ -140,3 +141,28 @@ def test_build_copy_number_matrix_combines_patients_into_gene_by_patient(tmp_pat
     assert matrix.loc["ENSG00000000001.1", "case-b"] == pytest.approx(
         relative_log2_copy_number(pd.Series([4])).iloc[0]
     )
+
+
+def test_select_top_variable_genes_keeps_highest_variance() -> None:
+    """The n most variable genes (by variance across patients) must be kept, in variance order."""
+    matrix = pd.DataFrame(
+        {
+            "case-a": [0.0, 0.0, 0.0],
+            "case-b": [10.0, 1.0, 0.0],
+            "case-c": [-10.0, -1.0, 0.0],
+        },
+        index=["high_var", "mid_var", "zero_var"],
+    )
+
+    top = select_top_variable_genes(matrix, n=2)
+
+    assert list(top.index) == ["high_var", "mid_var"]
+
+
+def test_select_top_variable_genes_keeps_all_when_n_exceeds_row_count() -> None:
+    """Requesting more genes than exist must return all of them, not error."""
+    matrix = pd.DataFrame({"case-a": [1.0, 2.0]}, index=["g1", "g2"])
+
+    top = select_top_variable_genes(matrix, n=100)
+
+    assert len(top) == 2

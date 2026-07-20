@@ -143,3 +143,25 @@ def build_copy_number_matrix(resolved_files: dict[str, Path]) -> pd.DataFrame:
         raw = read_gene_level_copy_number(path)
         columns[case_id] = relative_log2_copy_number(raw)
     return pd.DataFrame(columns)
+
+
+def select_top_variable_genes(matrix: pd.DataFrame, n: int) -> pd.DataFrame:
+    """Select the n most variable genes by variance across patients.
+
+    Without this step the CNV view has ~60,000 genes versus ~2,000-5,000
+    for the other omic views -- a large imbalance that would let CNV
+    dominate a MOFA+ model through sheer feature count. See
+    ``docs/adr/0006-mofa-plus-implementation-and-training.md``.
+
+    Args:
+        matrix: A gene x patient relative log2 copy number matrix.
+        n: Number of top-variable genes to keep. If ``matrix`` has fewer
+            than ``n`` rows, all rows are kept.
+
+    Returns:
+        The subset of rows with the highest variance, in descending order
+        of variance.
+    """
+    variances = matrix.var(axis=1, skipna=True)
+    top_genes = variances.sort_values(ascending=False).head(n).index
+    return matrix.loc[top_genes]
