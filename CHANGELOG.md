@@ -6,15 +6,16 @@ follow the milestone scheme in the README (v0.1.0 = ingestion +
 preprocessing working, v0.2.0 = MOFA+ integration working, v0.3.0 =
 scoring package + tests passing, v0.4.0 = external validation complete,
 v1.0.0 = full pipeline + report + docs complete and reproducible
-end-to-end).
+end-to-end). Patch versions (e.g. v0.3.1) mark real completed work
+between named milestones that the original scheme didn't assign its
+own number.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-20
+
 Drug-target/druggability evidence working end-to-end against the real
-709-candidate set. Not assigned its own milestone version in the
-original scheme (which jumps v0.3.0 scoring package → v0.4.0 external
-validation) — see commit/PR history for full detail until a version
-number is assigned.
+709-candidate set.
 
 - `oncocartograph.drug_targets` — Open Targets GraphQL client
   (`mapIds` gene-symbol resolution, `targets` tractability + UniProt
