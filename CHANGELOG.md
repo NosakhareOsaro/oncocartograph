@@ -15,7 +15,7 @@ own number.
 ## [1.0.0] - 2026-07-20
 
 Final work package: a real, runnable Snakemake pipeline, the preprint-style
-manuscript, and the Global Talent evidence mapping.
+manuscript.
 
 - `workflows/Snakefile` + `workflows/config.yaml` + `workflows/scripts/` —
   one real rule per stage (ingestion through external validation), each
