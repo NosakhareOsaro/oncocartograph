@@ -2,6 +2,9 @@
 
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from oncocartograph.config import Settings, get_settings
 
 
@@ -11,6 +14,16 @@ def test_settings_defaults() -> None:
     assert settings.data_dir == Path("data")
     assert settings.random_seed == 42
     assert settings.log_level == "INFO"
+    assert settings.gdc_api_base_url == "https://api.gdc.cancer.gov"
+    assert settings.gdc_page_size == 100
+    assert settings.gdc_request_timeout_seconds == 30.0
+    assert settings.gdc_max_retries == 3
+
+
+def test_gdc_page_size_must_be_positive() -> None:
+    """A non-positive page size would make GDC pagination loop forever or fail."""
+    with pytest.raises(ValidationError):
+        Settings(gdc_page_size=0)
 
 
 def test_derived_data_dirs_are_relative_to_data_dir() -> None:

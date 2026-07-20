@@ -19,6 +19,8 @@ classifiers = [
 dependencies = [
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
+    "requests>=2.31",
+    "pandas>=2.2",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +31,8 @@ dev = [
     "black>=24.3",
     "mypy>=1.9",
     "pre-commit>=3.7",
+    "types-requests>=2.31",
+    "pandas-stubs>=2.2",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -49,6 +53,11 @@ ignore = ["D203", "D213"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Test helper classes/fixtures are self-documenting via test names;
+# requiring docstrings on every fake/stub method is noise, not signal.
+"tests/**" = ["D"]
 
 [tool.mypy]
 python_version = "3.11"
