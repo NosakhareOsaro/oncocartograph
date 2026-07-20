@@ -405,9 +405,121 @@ subtype-specific druggable target calls, once `feat/validation` lands._
 
 ## 6. Drug-target evidence and prioritisation
 
-_Pending — will document the Open Targets and ChEMBL query strategy and
-tractability/bioactivity evidence weighting once
-`feat/drug-target-scoring` lands._
+Implemented in `oncocartograph.drug_targets`, which imports from (but is
+not imported by) `oncocartograph.scoring` — the scoring package's
+zero-cross-import guarantee (§4) is one-directional.
+
+### 6.1 Identifier resolution
+
+Three candidate identifier types exist in this project's real candidate
+set, requiring different resolution:
+
+- **RNA-seq/copy number** (versioned Ensembl IDs, e.g.
+  `ENSG00000172551.11`): version suffix stripped, used directly.
+- **Mutation** (gene symbols, e.g. `GTF3C1`): batch-resolved to Ensembl
+  IDs via Open Targets' `mapIds` query, confirmed to return an empty hit
+  list (not an error) for an unresolvable symbol.
+- **Methylation** (CpG probe IDs, e.g. `cg00000029`): **out of scope for
+  this work package.** Probe IDs are not gene identifiers; mapping to a
+  nearest/associated gene needs the Illumina 450K manifest, a new
+  reference dataset not part of any prior work package (see
+  [`docs/adr/0008-druggability-evidence-sources.md`](adr/0008-druggability-evidence-sources.md)).
+  Methylation candidates retain `druggability=None` (renormalized away)
+  until this is addressed.
+
+### 6.2 Open Targets tractability
+
+Open Targets' GraphQL `targets(ensemblIds: ...)` query returns ~28
+boolean tractability buckets per target across four modalities (SM=Small
+Molecule, AB=Antibody, PR=PROTAC, OC=Other Clinical) — confirmed via live
+queries against real targets (TP53, GTF3C1) before any code was written.
+Collapsed to a single [0, 1] score via a 3-tier scheme (identical
+bucket-label text across modalities means this only needs to inspect the
+label, not a per-modality table):
+
+| Condition | Score |
+|---|---|
+| Approved Drug true, any modality | 1.0 |
+| Advanced Clinical or Phase 1 Clinical true, any modality | 0.66 |
+| Any other bucket true | 0.33 |
+| No bucket true | 0.0 |
+
+### 6.3 ChEMBL max clinical phase
+
+ChEMBL's free-text target search is unreliable for exact gene matching
+(confirmed: searching "TP53" returns "TP53-binding protein 1" as the top
+hit). Targets are instead resolved by exact UniProt accession match
+(`target_components__accession__in`, restricted to
+`target_type=SINGLE PROTEIN`), using the canonical `uniprot_swissprot`
+accession from Open Targets' `proteinIds` (filtering out non-canonical
+TrEMBL entries, which are returned alongside it). The maximum `max_phase`
+(0-4) across all of ChEMBL's `mechanism` records for that target is used
+— real data has multiple mechanism records per target with different
+phases (confirmed: TP53 shows both phase 2 and phase 3 records), so a
+max, not first-or-last, aggregation is required.
+
+### 6.4 Combining into `tractability_score`
+
+`max(tractability_tier_score, chembl_max_phase / 4)` — either signal
+alone can indicate a real drug exists or is in development, so this
+project takes the stronger rather than averaging them down.
+`chembl_max_phase` is retained on `DruggabilityEvidence` separately for
+transparent reporting even though the composite formula (§4.3) reads
+only the combined `tractability_score`.
+
+### 6.5 Re-scoring result with all three evidence axes (2026-07-20)
+
+Re-ran composite scoring on the 480 RNA-seq/copy-number/mutation
+candidates from §4.4 (methylation's 229 candidates excluded per §6.1's
+scope decision) with real Open Targets + ChEMBL druggability evidence
+populated for **480/480 (100%)** — a large improvement over §4.4's run,
+where druggability was absent and renormalized away for every single
+candidate.
+
+**The ranking changed substantially, not marginally:** Spearman
+correlation between the before- and after-druggability rankings is
+ρ=0.656 (480 candidates, p=1.8×10⁻⁶⁰) — positive and significant, but far
+from 1.0. Only **4 of the previous top 20 candidates remained in the top
+20** once druggability was added (16/20 displaced); at the top 50, 22/50
+(44%) were displaced. Mean absolute rank change across all 480 candidates
+was ~78 positions (out of 480, i.e. ~16% of the full list).
+
+**Two clear, explainable patterns drove the reshuffling:**
+
+1. **Candidates with weak survival evidence but strong real druggability
+   jumped sharply.** The single biggest mover, `rna_seq:ENSG00000050555.19`,
+   went from rank 469.5→53 (Δ=+416.5) — its survival signal alone was
+   negligible (composite score 0.0002 before), but real druggability
+   evidence (an existing approved/late-phase drug) pulled it into the top
+   quarter once that 0.35-weight axis was no longer renormalized away.
+   Several other candidates showed the same pattern (Δ>390 positions).
+2. **Candidates with moderate survival/selection-pathway evidence but no
+   real druggability dropped sharply.** A cluster of copy-number
+   candidates sharing one genomic segment (the same shared-loading
+   pattern noted in §3.4) dropped from rank 64→351.5 (Δ=−287.5) once
+   their actual (weak) druggability evidence was factored in at full
+   weight rather than excluded.
+
+**A real, biologically sensible result:** the mutation-derived `TP53`
+candidate — bypassing MOFA+ entirely per this project's two-pathway
+architecture (§4.1) — ranked **7th overall** (composite score 0.466),
+with `tractability_score=0.75` and `chembl_max_phase=3.0`, both
+reflecting TP53's genuine, well-documented drug development history
+(confirmed directly against the real ChEMBL API in §6.3). This is exactly
+the kind of candidate the mutation-recurrence pathway was designed to
+surface, since MOFA+ factor loadings could never have found it (§3.4:
+mutation view contributed ≤0.003% variance to every factor).
+
+**Interpretation:** this reshuffling is evidence the composite score is
+doing real work, not just re-deriving the survival ranking with cosmetic
+reweighting — a substantial fraction of top candidates are only
+"top" once actionability (does a real drug exist or is one in
+development) is considered alongside statistical association. Given
+§4.4's honest finding that 0 candidates reached FDR-corrected
+significance, this ranking should still be read as hypothesis-generating:
+druggability evidence changes *which* statistically-modest associations
+are worth following up on, not the underlying statistical confidence in
+any of them.
 
 ## 7. Software and versions
 
