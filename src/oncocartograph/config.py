@@ -25,6 +25,13 @@ class Settings(BaseSettings):
             whichever seed is actually used.
         log_level: Python ``logging`` level name applied to all
             OncoCartograph loggers.
+        gdc_api_base_url: Base URL for the GDC REST API (see
+            https://docs.gdc.cancer.gov/API/Users_Guide/Getting_Started/).
+        gdc_page_size: Number of hits requested per page when paginating
+            GDC ``files``/``cases`` queries.
+        gdc_request_timeout_seconds: Per-request timeout for GDC API calls.
+        gdc_max_retries: Number of retries for transient GDC API failures
+            (connection errors, 5xx responses) before giving up.
     """
 
     model_config = SettingsConfigDict(
@@ -36,6 +43,11 @@ class Settings(BaseSettings):
     data_dir: Path = Field(default=Path("data"))
     random_seed: int = Field(default=42)
     log_level: str = Field(default="INFO")
+
+    gdc_api_base_url: str = Field(default="https://api.gdc.cancer.gov")
+    gdc_page_size: int = Field(default=100, gt=0, le=2000)
+    gdc_request_timeout_seconds: float = Field(default=30.0, gt=0)
+    gdc_max_retries: int = Field(default=3, ge=0)
 
     @property
     def raw_data_dir(self) -> Path:
