@@ -12,6 +12,47 @@ own number.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-20
+
+Final work package: a real, runnable Snakemake pipeline, the preprint-style
+manuscript, and the Global Talent evidence mapping.
+
+- `workflows/Snakefile` + `workflows/config.yaml` + `workflows/scripts/` —
+  one real rule per stage (ingestion through external validation), each
+  calling the already-tested `oncocartograph.*` library functions.
+  Verified via a full dry-run DAG from a completely clean `data/` state
+  and by actually executing every fast/already-cached rule for real,
+  reproducing the already-published numbers and a second independent
+  confirmation of the external validation's null result (39.8%
+  concordance, p=0.988, vs. the original 41.3%/p=0.973; Burstein check
+  still 5/5).
+- `oncocartograph.data_ingestion.clinical.derive_survival_outcome` — the
+  duration/event derivation feeding all survival analysis only ever
+  existed as untested ad-hoc scratchpad logic; now tested and committed.
+  Caught and fixed a real index-alignment bug while writing its first
+  test.
+- Intermediate pipeline views are Parquet, not pickle — motivated by a
+  real bug hit in `feat/validation` (a cached pickle became unreadable
+  after a pandas version change).
+- `docs/manuscript.md` — preprint-style write-up. The pre-registered
+  external validation's primary-criterion failure is stated in the
+  abstract and conclusion alongside the positive findings, not
+  separated into a limitations section a skimming reader could miss.
+- `docs/global_talent_evidence.md` — maps the real project history to
+  the original 5-bullet evidence checklist, including the two corrected
+  mistakes (GISTIC2 assumption, MOFA+ view-ordering bug) and the honest
+  null validation result, framed as evidence of a falsifiable design
+  that worked as intended rather than a weakness to minimize. Does not
+  fabricate a Zenodo DOI that doesn't exist yet.
+- `docs/methods.md` §7 (real pinned software versions) and §8
+  (final limitations pass) completed.
+- README status banner, Quickstart, Pipeline DAG, and Reproducibility
+  sections updated to describe the real pipeline rather than a pending
+  one.
+- 4 new tests (207 total), 100% coverage on new modules, verified in the
+  Python 3.11 Docker image (mypy --strict, ruff, black, pytest all
+  clean) before each commit.
+
 ## [0.4.0] - 2026-07-20
 
 External validation against GSE96058 (SCAN-B), a real independent RNA-seq
