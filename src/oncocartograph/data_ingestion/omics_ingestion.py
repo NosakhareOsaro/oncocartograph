@@ -93,6 +93,7 @@ def methylation_file_filter(case_ids: Sequence[str]) -> dict[str, Any]:
         [
             _in_filter("data_category", ["DNA Methylation"]),
             _in_filter("platform", ["Illumina Human Methylation 450"]),
+            _in_filter("data_type", ["Methylation Beta Value"]),
         ],
     )
 
