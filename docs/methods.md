@@ -83,10 +83,109 @@ IHC-equivocal-without-FISH as negative) that was considered and rejected.
 
 ## 2. Data preprocessing
 
-_Pending — will document per-omic QC thresholds (RNA-seq low-count
-filtering, methylation probe filtering/masking, CNV segmentation handling,
-MAF variant filtering) and normalisation methods once
-`feat/preprocessing` lands._
+### 2.1 Sample resolution (all omic layers)
+
+Files ingested in `feat/data-ingestion` can include more than one file per
+patient per layer: matched normal or metastatic samples alongside the
+primary tumor (RNA-seq, methylation), and — for copy number and mutation,
+which are produced by tumor-normal paired callers — a germline reference
+sample listed alongside the tumor sample against the *same* file, not a
+separate one. `oncocartograph.preprocessing.sample_manifest` resolves
+every layer to one **Primary Tumor** sample per patient (membership check
+on the file's sample types, not exclusivity), with a deterministic
+tie-break (smallest file UUID) for the rare patient with more than one
+qualifying file. Patients with no Primary Tumor file for a given layer are
+simply absent from that layer's matrix — this project does not force a
+smaller complete-case cohort across all four omics, relying instead on
+MOFA+'s native support for partially-overlapping views.
+
+Confirmed patient counts after resolution (live pull, 2026-07-20, of the
+143-patient TNBC cohort):
+
+| Layer | Resolved patients | Note |
+|---|---|---|
+| RNA-seq | 142 | 1 patient has no RNA-seq file at all |
+| Methylation | ~106 | Largest gap — many TNBC patients lack a 450K profile in TCGA-BRCA |
+| Copy number | 142 | See §2.3 for the additional workflow-resolution step |
+| Mutation | ~122 | Some patients lack WXS/mutation calls |
+
+### 2.2 RNA-seq (`oncocartograph.preprocessing.rna_seq`)
+
+- **Input:** GDC STAR-Counts `augmented_star_gene_counts.tsv`, raw
+  (`unstranded`) counts column. STAR's four alignment-summary rows
+  (`N_unmapped`, `N_multimapping`, `N_noFeature`, `N_ambiguous`) are
+  removed before use.
+- **Low-expression filter:** genes must reach ≥1 CPM in ≥10% of samples
+  (edgeR `filterByExpr`-style convention) to be retained. On a 10-patient
+  real-data check this reduced 60,660 to 25,186 genes.
+- **Normalization:** DESeq2-style median-of-ratios size-factor
+  normalization and variance-stabilizing transformation (VST), via
+  `pydeseq2` (`design="~1"`, no differential-expression contrast — MOFA+
+  discovers structure directly from the resulting continuous values).
+  Chosen over a simpler log2(TPM+1) approach because size factors correct
+  for library-composition differences more robustly than TPM alone.
+- **Feature selection:** top 2,000 genes by variance across patients, for
+  MOFA+ tractability.
+
+### 2.3 Copy number (`oncocartograph.preprocessing.copy_number`)
+
+- **Input:** GDC gene-level copy number files. **Correction to the
+  original data plan:** these report absolute integer total copy number
+  per gene (2 = diploid), not GISTIC2 thresholded categorical calls as
+  first assumed — see
+  [`docs/adr/0005-copy-number-workflow-and-transform.md`](adr/0005-copy-number-workflow-and-transform.md).
+- **Workflow resolution:** up to four calling workflows exist per
+  patient (ASCAT3, ASCAT2, ABSOLUTE LiftOver, AscatNGS — confirmed via
+  live GDC metadata query, not assumed from filenames). Preference order:
+  ASCAT3 > ASCAT2 > ABSOLUTE LiftOver > AscatNGS. On the real 143-patient
+  cohort this resolved 142 patients: 138 via ASCAT3 directly, 3 falling
+  back to ASCAT2, 1 to ABSOLUTE LiftOver.
+- **Transform:** relative-to-diploid log2,
+  `log2((copy_number + 1) / (2 + 1))` — zeroes the diploid baseline
+  exactly while keeping homozygous deletion (CN=0) finite. Does not
+  correct for tumor purity/ploidy (§8 Limitations).
+
+### 2.4 DNA methylation (`oncocartograph.preprocessing.methylation`)
+
+- **Input:** GDC SeSAMe `level3betas.txt` processed beta values only —
+  the ingestion filter was corrected during this work package to exclude
+  raw `.idat` intensity files it had also been pulling (see git history
+  for `feat(data-ingestion)`). 486,427 probes per patient, matching the
+  450K array; ~14% already `NA` from SeSAMe's own probe masking, so no
+  additional cross-reactive-probe blacklist is applied here.
+- **Missingness filter:** probes missing in more than an operator-set
+  fraction of profiled patients are dropped.
+- **Transform:** beta → M-value via the logit transform (Du et al. 2010,
+  *BMC Bioinformatics* 11:587), with beta clipped to
+  `[1e-6, 1 - 1e-6]` first so 0/1 stay finite. M-values are the
+  recommended representation for regression/factor-analysis use, since
+  beta values are bounded and heteroscedastic near the extremes.
+- **Feature selection:** top 5,000 probes by variance across patients,
+  kept at probe (not gene-aggregated) resolution — gene-level
+  interpretation happens later, during biomarker scoring, by annotating
+  top-loading probes back to genes.
+
+### 2.5 Somatic mutation (`oncocartograph.preprocessing.mutation`)
+
+- **Input:** GDC Masked Somatic Mutation MAFs (MC3-derived ensemble
+  calls), already one tumor-normal-paired file per patient.
+- **Variant filter:** an explicit allow-list of non-synonymous
+  `Variant_Classification` values (`Missense_Mutation`,
+  `Nonsense_Mutation`, `Nonstop_Mutation`, `Frame_Shift_Del`,
+  `Frame_Shift_Ins`, `In_Frame_Del`, `In_Frame_Ins`, `Splice_Site`,
+  `Translation_Start_Site`), confirmed against the real vocabulary
+  present in downloaded files. `Silent`/`Intron`/UTR/`RNA` variants are
+  excluded.
+- **Representation:** binary gene × patient matrix (1 = ≥1 non-synonymous
+  variant in that gene for that patient), for a Bernoulli MOFA+ view.
+- **Recurrence filter:** genes mutated in fewer than 3 patients (~2% of
+  the mutation-data subset) are dropped. No restriction to a curated
+  cancer gene panel — deliberately whole-exome, to preserve discovery
+  potential for non-obvious biomarkers rather than only recovering
+  already-known genes.
+- **Real sanity check:** on a 10-patient subset, TP53 was mutated in 7/10
+  patients, consistent with its well-established ~80% mutation frequency
+  in TNBC.
 
 ## 3. Multi-omics integration (MOFA+)
 
@@ -134,3 +233,15 @@ validation), so external validation in this project is necessarily
 expression-centric. The Burstein et al. 2015 benchmark cohort is not
 population-matched to TCGA-BRCA. These limitations will be expanded with
 concrete impact assessments once results exist to discuss.
+
+**Added during `feat/preprocessing`:** the copy number relative-log2
+transform (§2.3) does not correct for tumor purity or ploidy — a real
+tumor with whole-genome doubling will show systematically shifted
+relative copy number values that this pipeline cannot distinguish from
+true focal amplification/deletion without a purity/ploidy estimate per
+sample (see ADR 0005). Methylation coverage in the TNBC cohort is
+substantially incomplete (~106/143 patients have a usable 450K profile,
+§2.1) — MOFA+'s partial-view handling means this doesn't block the
+pipeline, but it does mean the methylation view's contribution to any
+downstream factor is supported by a smaller effective N than the other
+three omics.
