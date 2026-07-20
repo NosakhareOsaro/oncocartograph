@@ -125,8 +125,21 @@ candidate ranked 7th overall, with real ChEMBL evidence
 candidate MOFA+ factor loadings could never have surfaced. Full
 breakdown in `docs/methods.md` §6.5.
 
-Validation results are pending that work package — no placeholder
-figures are included here.
+**External validation (2026-07-20):** the pre-registered primary
+criterion — direction concordance between TCGA and GSE96058 (SCAN-B, a
+real independent RNA-seq TNBC cohort, N=143, 26 events), tested against
+chance with a one-sided exact binomial test at alpha=0.05, fixed *before*
+the analysis was run — **failed**. Of 152 TCGA candidates, 109 had usable
+GSE96058 evidence; only 45 (41.3%) were direction-concordant, below the
+50% chance rate (p=0.973). This is consistent with the scoring package's
+own 0/709 FDR-significant screen: there was no real signal in TCGA for
+GSE96058 to replicate. The scope-reduced Burstein et al. (2015)
+known-biology check (AR, PTEN, CD274, PDCD1, CTLA4 — not the full
+LAR/MES/BLIS/BLIA subtyping) passed 5/5, a real but separate result that
+does not offset the primary null finding. Reported honestly as a
+limitation rather than reframed; full breakdown in `docs/methods.md` §5
+and ADR 0009. Per-candidate evidence:
+`data/processed/gse96058_replication_table.csv`.
 
 ## Reproducibility
 
