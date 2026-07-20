@@ -89,10 +89,23 @@ breakdown in `docs/methods.md` §1.2.
 methylation (450K), 426 copy number (gene-level), and 126 mutation
 (Masked Somatic Mutation) files — ~5.4 GB total, each with a checksummed
 provenance sidecar. File counts exceed 143 because several patients have
-multiple samples/aliquots; deduplication happens in `feat/preprocessing`.
+multiple samples/aliquots; resolved to one Primary Tumor sample per
+patient in `feat/preprocessing`.
 
-Integration, scoring, and validation results are pending those work
-packages — no placeholder figures are included here.
+**MOFA+ integration (2026-07-20):** trained on the preprocessed cohort
+(copy number 2,000×142, RNA-seq 2,000×142, methylation 5,000×104,
+mutation 845×122; 143 patients total via view union, no forced
+complete-case subset). 12 of 15 factors clear a ≥2%-variance-explained
+screening threshold. Two honest findings, not glossed over: Factor1 is
+almost entirely copy-number-driven (56.5% CNV variance, <1.1% elsewhere)
+and likely reflects broad genomic instability rather than shared
+multi-omic biology; the mutation view contributes essentially no
+variance to any factor (≤0.003%), so mutation-derived biomarkers will
+need direct statistics rather than MOFA+ loadings. Full breakdown in
+`docs/methods.md` §3.4.
+
+Scoring and validation results are pending those work packages — no
+placeholder figures are included here.
 
 ## Reproducibility
 

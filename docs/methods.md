@@ -189,11 +189,103 @@ Confirmed patient counts after resolution (live pull, 2026-07-20, of the
 
 ## 3. Multi-omics integration (MOFA+)
 
-_Pending — will document factor count justification, convergence
-criteria, random seed handling, and factor-to-biology interpretation
-approach once `feat/mofa-integration` lands. See
-`docs/adr/0002-workflow-engine-choice.md` for the orchestration decision
-made ahead of this stage._
+### 3.1 Implementation
+
+MOFA+ models are trained with `mofapy2` and read/interpreted with `mofax`
+— both pure Python (see
+[`docs/adr/0006-mofa-plus-implementation-and-training.md`](adr/0006-mofa-plus-implementation-and-training.md)
+for why this needed no R environment, correcting an earlier assumption).
+
+### 3.2 View construction and likelihoods
+
+Each of the four preprocessed omic matrices (§2) is melted into MOFA+'s
+long-format input (`sample, feature, view, group, value`) and combined
+into a single training input. Missing values — whether a patient
+entirely absent from a view, or a scattered missing value within an
+otherwise-present sample — are represented by the row's absence, not by
+an explicit `NaN`; both cases were verified directly to train correctly
+before this was relied on.
+
+| View | Likelihood | Rationale |
+|---|---|---|
+| RNA-seq (VST, top-2,000 genes) | Gaussian | Continuous, approximately normal after VST |
+| Methylation (M-value, top-5,000 probes) | Gaussian | Continuous, unbounded (unlike beta values) |
+| Copy number (relative log2, top-2,000 genes) | Gaussian | Continuous, log-ratio scale |
+| Mutation (binary, recurrence-filtered) | Bernoulli | Discrete presence/absence |
+
+`scale_views=True` scales each view to unit variance before training, so
+no view dominates purely through differences in value magnitude.
+
+### 3.3 Training configuration
+
+- **Factors:** initialised with K=15, a middle-of-the-road choice for a
+  ~100-150 sample cohort matching common practice in published MOFA+
+  multi-omics analyses at this scale. ARD priors on feature weights
+  (mofapy2 default) provide within-factor sparsity; factors explaining
+  <2% of variance in every view are excluded from downstream
+  interpretation (not training) — this is a post-hoc screening step, not
+  a change to K itself.
+- **Convergence:** `convergence_mode="slow"`, the tightest ELBO tolerance
+  mofapy2 offers, chosen for a final citable analysis over faster/looser
+  exploratory settings.
+- **Seed:** `Settings.random_seed` (project default 42), logged by
+  mofapy2 at training time.
+
+### 3.4 Real training result (2026-07-20)
+
+Trained on the full real preprocessed cohort — copy number (2,000 x 142),
+RNA-seq (2,000 x 142), methylation (5,000 x 104), mutation (845 x 122) —
+with no forced complete-case restriction; 143 total patients are
+represented in the resulting factor matrix (the union across views).
+Training took 77.7s and ran the full 1,000-iteration cap without
+formally reaching `"slow"` mode's ELBO tolerance, though by the final
+iterations ELBO was changing by <0.0002% per step — practically
+converged for interpretation purposes. A longer `max_iterations` cap is
+a candidate refinement for a final canonical run, not applied here.
+
+**Variance explained per factor** (%, screening threshold ≥2% in at
+least one view):
+
+| Factor | Copy number | Methylation | Mutation | RNA-seq |
+|---|---|---|---|---|
+| Factor1 | 56.50 | 0.01 | 0.00 | 1.09 |
+| Factor2 | 0.31 | 17.67 | 0.00 | 2.77 |
+| Factor3 | 0.20 | 5.77 | 0.00 | 7.93 |
+| Factor4 | 1.00 | 4.78 | 0.00 | 5.14 |
+| Factor6 | 4.91 | 0.05 | 0.00 | 0.09 |
+| Factor5 | 0.11 | 4.55 | 0.00 | 2.32 |
+| Factor7 | 0.48 | 4.40 | 0.00 | 0.11 |
+| Factor8 | 3.26 | 0.32 | 0.00 | 0.24 |
+| Factor10 | 2.95 | 0.04 | 0.00 | 0.23 |
+| Factor9 | -1.20 | 2.82 | 0.00 | 1.87 |
+| Factor13 | 2.42 | 0.00 | 0.00 | 0.01 |
+| Factor14 | 2.07 | 0.02 | 0.00 | 0.01 |
+| ~~Factor15~~ | 1.81 | 0.01 | 0.00 | 0.16 |
+| ~~Factor12~~ | 1.79 | 0.31 | 0.00 | 0.57 |
+| ~~Factor11~~ | 1.61 | 0.75 | 0.00 | 0.47 |
+
+**12 of 15 factors clear the ≥2% screening threshold** in at least one
+view (Factors 11, 12, 15 struck through above do not and are excluded
+from downstream interpretation). Two things worth noting honestly:
+
+- **Factor1 is overwhelmingly copy-number-driven** (56.5% of CNV
+  variance, <1.1% everywhere else) — likely reflects a broad genomic
+  instability / aneuploidy axis rather than a multi-omic signal, and
+  should be interpreted as such rather than assumed to reflect shared
+  cross-omic biology.
+- **The mutation view contributes essentially nothing to any factor**
+  (≤0.003% variance explained everywhere). This is a real result, not a
+  bug: after the ≥3-patient recurrence filter, 845 genes remain but
+  mutation events are inherently sparse and largely private to individual
+  patients, giving MOFA+ little shared structure to extract via a
+  Bernoulli likelihood at this cohort size. Mutation-derived biomarker
+  candidates in this project will need to rely more on direct
+  recurrence/association statistics (`feat/scoring-package`) than on
+  MOFA+ factor loadings.
+- Most substantial shared cross-omic structure appears in
+  Factors 2-5 and 9 (methylation + RNA-seq, and to a lesser extent
+  copy number), consistent with expression and methylation both reading
+  out overlapping regulatory biology.
 
 ## 4. Composite biomarker scoring
 
@@ -245,3 +337,15 @@ substantially incomplete (~106/143 patients have a usable 450K profile,
 pipeline, but it does mean the methylation view's contribution to any
 downstream factor is supported by a smaller effective N than the other
 three omics.
+
+**Added during `feat/mofa-integration`:** the real trained model's
+mutation view contributes essentially no variance to any of the 15
+factors (≤0.003% everywhere, §3.4) — mutation-derived biomarker
+candidates will need direct recurrence/association statistics rather
+than MOFA+ factor loadings. Factor1 (56.5% of copy number variance,
+<1.1% elsewhere) most likely reflects broad genomic instability rather
+than a genuine shared multi-omic axis, and should not be over-interpreted
+as such during biomarker scoring. Training reached the 1,000-iteration
+cap without formally satisfying `"slow"` mode's ELBO tolerance (though
+the remaining change per iteration was <0.0002%); a longer iteration cap
+is a candidate refinement for a final canonical run.
