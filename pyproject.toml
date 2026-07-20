@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings>=2.2",
     "requests>=2.31",
     "pandas>=2.2",
+    "pydeseq2>=0.4",
 ]
 
 [project.optional-dependencies]
@@ -67,6 +68,13 @@ mypy_path = "src"
 disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_ignores = true
+
+# pydeseq2 ships no type stubs / py.typed marker (verified, not fixable
+# from our side); ignore-missing-imports is scoped to just this package
+# rather than relaxed globally.
+[[tool.mypy.overrides]]
+module = "pydeseq2.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
