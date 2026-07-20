@@ -4,6 +4,7 @@ title: "OncoCartograph: Integrative Multi-Omics Biomarker Prioritisation for Tri
 type: software
 version: 1.0.0
 date-released: 2026-07-20
+doi: 10.5281/zenodo.21462839
 authors:
   - family-names: Osaro
     given-names: Nosakhare

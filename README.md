@@ -1,5 +1,7 @@
 # OncoCartograph
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21462838.svg)](https://doi.org/10.5281/zenodo.21462838)
+
 **Integrative multi-omics biomarker prioritisation for triple-negative breast cancer (TNBC).**
 
 > **Status: pipeline complete, results honestly mixed.** All stages
