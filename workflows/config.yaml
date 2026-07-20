@@ -1,0 +1,42 @@
+# OncoCartograph pipeline configuration.
+#
+# Paths are relative to the repository root (Snakemake's working
+# directory when run as `snakemake -s workflows/Snakefile`). API base
+# URLs/timeouts mirror oncocartograph.config.Settings's defaults; they
+# are repeated here (rather than imported) so this file is a complete,
+# human-readable record of what a run actually used.
+
+data_dir: data
+random_seed: 42
+
+gdc_api_base_url: "https://api.gdc.cancer.gov"
+open_targets_api_base_url: "https://api.platform.opentargets.org/api/v4/graphql"
+chembl_api_base_url: "https://www.ebi.ac.uk/chembl/api/data"
+
+gse96058:
+  clinical_urls:
+    - "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE96nnn/GSE96058/matrix/GSE96058-GPL11154_series_matrix.txt.gz"
+    - "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE96nnn/GSE96058/matrix/GSE96058-GPL18573_series_matrix.txt.gz"
+  expression_url: "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE96nnn/GSE96058/suppl/GSE96058_gene_expression_3273_samples_and_136_replicates_transformed.csv.gz"
+
+preprocessing:
+  rna_seq_min_cpm: 1.0
+  rna_seq_min_fraction_samples: 0.1
+  rna_seq_top_n_genes: 2000
+  methylation_max_missing_fraction: 0.2
+  methylation_top_n_probes: 5000
+  copy_number_top_n_genes: 2000
+  mutation_min_recurrent_patients: 3
+
+mofa:
+  n_factors: 15
+  convergence_mode: "slow"
+  max_iterations: 1000
+  variance_explained_threshold_percent: 2.0
+
+scoring:
+  fdr_alpha: 0.05
+
+validation:
+  concordance_alpha: 0.05
+  burstein_marker_genes: ["AR", "PTEN", "CD274", "PDCD1", "CTLA4"]
