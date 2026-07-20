@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 from lifelines import CoxPHFitter
 from lifelines.exceptions import ConvergenceError
@@ -88,6 +89,22 @@ def fit_univariate_cox(
         return None
 
     summary = cph.summary.loc["value"]
+    key_stats = summary[["exp(coef)", "exp(coef) lower 95%", "exp(coef) upper 95%", "p"]].to_numpy(
+        dtype=float
+    )
+    if not np.all(np.isfinite(key_stats)):
+        # lifelines does not always raise on degenerate fits -- a very rare
+        # or very sparse binary covariate (e.g. mutated in only 1-4 of 122
+        # patients, with zero events in that subgroup) can converge to a
+        # trivial, uninformative solution instead of raising: sometimes NaN
+        # summary statistics, sometimes a finite-but-meaningless estimate
+        # with an infinite confidence bound (HR~0, CI upper=inf). Both were
+        # confirmed on real TCGA-BRCA mutation data (~11% of
+        # recurrence-filtered genes) and both must be excluded here, not
+        # passed through to FDR correction (which raises on out-of-range
+        # p-values and would be misled by an unbounded CI regardless).
+        return None
+
     return SurvivalEvidence(
         hazard_ratio=float(summary["exp(coef)"]),
         hazard_ratio_ci_low=float(summary["exp(coef) lower 95%"]),

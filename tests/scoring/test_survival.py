@@ -96,6 +96,28 @@ def test_fit_univariate_cox_returns_none_for_zero_variance_biomarker() -> None:
     assert result is None
 
 
+def test_fit_univariate_cox_returns_none_for_degenerate_sparse_binary_covariate() -> None:
+    """A rare binary marker with zero events in its mutated subgroup must return None,
+    not a SurvivalEvidence with NaN statistics.
+
+    Reproduces a real bug found running against the actual TCGA-BRCA TNBC
+    mutation data: lifelines does not raise on this degenerate case, it
+    returns a "successful" fit with NaN summary statistics, which later
+    broke FDR correction (scipy raises on out-of-range p-values). ~11% of
+    real recurrence-filtered mutation genes hit this in practice.
+    """
+    n = 122
+    # Marker is 1 for exactly 3 patients, all of whom are censored (event=0)
+    # -- zero events in the mutated subgroup, the actual real-world pattern.
+    marker = pd.Series([1] * 3 + [0] * (n - 3))
+    duration = pd.Series(np.random.default_rng(10).exponential(500, n))
+    event = pd.Series([0, 0, 0] + [1] * 10 + [0] * (n - 13))
+
+    result = fit_univariate_cox(marker, duration, event)
+
+    assert result is None
+
+
 def test_fit_univariate_cox_returns_none_for_too_few_samples() -> None:
     """A single-patient input cannot support a Cox fit."""
     result = fit_univariate_cox(
@@ -123,20 +145,29 @@ def test_screen_survival_associations_screens_multiple_features() -> None:
     protective = -hidden_covariate
     noise = pd.Series(rng.normal(size=150), index=duration.index)
     constant = pd.Series([1.0] * 150, index=duration.index)
+    # Degenerate sparse binary marker (zero events in its mutated subgroup)
+    # must not reach FDR correction with a NaN p-value and crash the batch.
+    # Deterministically pick 3 censored (event=0) patients as "mutated" so
+    # the mutated subgroup is guaranteed to have zero observed events.
+    censored_patients = event[event == 0].index[:3]
+    degenerate = pd.Series(0, index=duration.index)
+    degenerate.loc[censored_patients] = 1
 
     matrix = pd.DataFrame(
-        [harmful, protective, noise, constant],
-        index=["harmful_gene", "protective_gene", "noise_gene", "constant_gene"],
+        [harmful, protective, noise, constant, degenerate],
+        index=["harmful_gene", "protective_gene", "noise_gene", "constant_gene", "degenerate_gene"],
     )
 
     results = screen_survival_associations(matrix, duration, event)
 
     assert set(results.index) == {"harmful_gene", "protective_gene", "noise_gene"}
     assert "constant_gene" not in results.index
+    assert "degenerate_gene" not in results.index
     assert "p_adj" in results.columns
     assert results.loc["harmful_gene", "hazard_ratio"] > 1.0
     assert results.loc["protective_gene", "hazard_ratio"] < 1.0
     assert (results["p_adj"] >= results["p_value"]).all()
+    assert results["p_value"].between(0, 1).all()
 
 
 def test_screen_survival_associations_empty_matrix_returns_empty_frame() -> None:
