@@ -7,8 +7,9 @@ date-released: 2026-07-20
 doi: 10.5281/zenodo.21462839
 authors:
   - family-names: Osaro
-    given-names: Nosakhare
+    given-names: Nosakhare Odionfo
     email: osaronosakhare@gmail.com
+    orcid: "https://orcid.org/0009-0004-9778-1161"
 license: MIT
 repository-code: "https://github.com/NosakhareOsaro/oncocartograph"
 keywords:
